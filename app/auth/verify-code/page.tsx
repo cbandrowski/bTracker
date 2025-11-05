@@ -2,10 +2,10 @@
 
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 
-export default function VerifyCodePage() {
+function VerifyCodeContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
@@ -39,8 +39,9 @@ export default function VerifyCodePage() {
       setError(error.message)
       setLoading(false)
     } else if (data.session) {
-      // Successfully verified, redirect to dashboard
-      router.push('/dashboard')
+      // Successfully verified, redirect to onboarding for new users
+      console.log('✅ [VerifyCode] Email verified successfully, redirecting to onboarding')
+      router.push('/onboarding')
     } else {
       setError('Verification failed. Please try again.')
       setLoading(false)
@@ -164,5 +165,17 @@ export default function VerifyCodePage() {
         </form>
       </div>
     </div>
+  )
+}
+
+export default function VerifyCodePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-xl text-gray-600">Loading...</div>
+      </div>
+    }>
+      <VerifyCodeContent />
+    </Suspense>
   )
 }
