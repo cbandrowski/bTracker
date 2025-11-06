@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 type Step = 'profile' | 'company-choice' | 'create-company' | 'join-company'
 
@@ -14,8 +15,21 @@ export default function OnboardingPage() {
   const [userId, setUserId] = useState<string | null>(null)
 
   // Profile form data
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [profileData, setProfileData] = useState({
-    full_name: '',
+    phone: '',
+    email: '',
+    address: '',
+    address_line_2: '',
+    city: '',
+    state: '',
+    zipcode: '',
+    country: 'USA',
+  })
+
+  // Saved profile data (after form submission)
+  const [savedProfileData, setSavedProfileData] = useState({
     phone: '',
     email: '',
     address: '',
@@ -40,11 +54,12 @@ export default function OnboardingPage() {
     website: '',
   })
 
+  // Use profile data for company checkbox
+  const [useProfileData, setUseProfileData] = useState(false)
+
   // Join company data
   const [companyCode, setCompanyCode] = useState('')
-  const [jobTitle, setJobTitle] = useState('')
-  const [department, setDepartment] = useState('')
-  const [hireDate, setHireDate] = useState(new Date().toISOString().split('T')[0])
+  const [matchedCompanyName, setMatchedCompanyName] = useState<string | null>(null)
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -125,10 +140,14 @@ export default function OnboardingPage() {
         .from('profiles')
         .insert({
           id: userId!,
+          full_name: `${firstName} ${lastName}`.trim(),
           ...profileData,
         })
 
       if (profileError) throw profileError
+
+      // Save the profile data for later use when creating company
+      setSavedProfileData(profileData)
 
       setCurrentStep('company-choice')
     } catch (err: any) {
@@ -209,6 +228,68 @@ export default function OnboardingPage() {
     }
   }
 
+  const handleUseProfileDataToggle = (checked: boolean) => {
+    setUseProfileData(checked)
+
+    if (checked) {
+      // Copy saved profile data to company data
+      setCompanyData({
+        ...companyData,
+        address: savedProfileData.address,
+        address_line_2: savedProfileData.address_line_2,
+        city: savedProfileData.city,
+        state: savedProfileData.state,
+        zipcode: savedProfileData.zipcode,
+        country: savedProfileData.country,
+        phone: savedProfileData.phone,
+        email: savedProfileData.email,
+      })
+    } else {
+      // Clear the copied fields (but keep company name and website)
+      setCompanyData({
+        ...companyData,
+        address: '',
+        address_line_2: '',
+        city: '',
+        state: '',
+        zipcode: '',
+        country: 'USA',
+        phone: '',
+        email: '',
+      })
+    }
+  }
+
+  const lookupCompany = async (code: string) => {
+    if (!code || code.length < 3) {
+      setMatchedCompanyName(null)
+      return
+    }
+
+    try {
+      const { data: company, error } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('company_code', code.toUpperCase())
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error looking up company:', error)
+        setMatchedCompanyName(null)
+        return
+      }
+
+      if (company) {
+        setMatchedCompanyName(company.name)
+      } else {
+        setMatchedCompanyName(null)
+      }
+    } catch (err) {
+      console.error('Error looking up company:', err)
+      setMatchedCompanyName(null)
+    }
+  }
+
   const handleJoinCompany = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -234,6 +315,12 @@ export default function OnboardingPage() {
         return
       }
 
+      // If company code is empty, skip and go to dashboard
+      if (!companyCode.trim()) {
+        router.push('/dashboard')
+        return
+      }
+
       // Find company by code
       const { data: company, error: companyError } = await supabase
         .from('companies')
@@ -248,15 +335,15 @@ export default function OnboardingPage() {
         return
       }
 
-      // Create employee relationship
+      // Create employee relationship with today's date as hire date
       const { error: employeeError } = await supabase
         .from('company_employees')
         .insert({
           company_id: company.id,
           profile_id: userId!,
-          hire_date: hireDate,
-          job_title: jobTitle || null,
-          department: department || null,
+          hire_date: new Date().toISOString().split('T')[0],
+          job_title: null,
+          department: null,
           employment_status: 'active',
           is_manager: false,
         })
@@ -289,15 +376,27 @@ export default function OnboardingPage() {
               <h2 className="text-xl font-semibold text-gray-900">Tell us about yourself</h2>
 
               <div className="grid grid-cols-1 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Full Name *</label>
-                  <input
-                    type="text"
-                    required
-                    value={profileData.full_name}
-                    onChange={(e) => setProfileData({ ...profileData, full_name: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">First Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={firstName}
+                      onChange={(e) => setFirstName(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Last Name *</label>
+                    <input
+                      type="text"
+                      required
+                      value={lastName}
+                      onChange={(e) => setLastName(e.target.value)}
+                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    />
+                  </div>
                 </div>
 
                 <div>
@@ -320,15 +419,22 @@ export default function OnboardingPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Address</label>
-                  <input
-                    type="text"
-                    value={profileData.address}
-                    onChange={(e) => setProfileData({ ...profileData, address: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-                  />
-                </div>
+                <AddressAutocomplete
+                  label="Address"
+                  value={profileData.address}
+                  onChange={(value) => setProfileData({ ...profileData, address: value })}
+                  onPlaceSelected={(components) => {
+                    setProfileData({
+                      ...profileData,
+                      address: components.address,
+                      city: components.city,
+                      state: components.state,
+                      zipcode: components.zipcode,
+                      country: components.country,
+                    })
+                  }}
+                  placeholder="Start typing your address..."
+                />
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Address Line 2</label>
@@ -413,6 +519,24 @@ export default function OnboardingPage() {
             <form onSubmit={handleCreateCompany} className="space-y-6">
               <h2 className="text-xl font-semibold text-gray-900">Create Your Company</h2>
 
+              {/* Checkbox to use profile data */}
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+                <label className="flex items-start cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={useProfileData}
+                    onChange={(e) => handleUseProfileDataToggle(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                  />
+                  <div className="ml-3">
+                    <span className="text-sm font-medium text-gray-900">Use my profile information for company</span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Perfect for mobile businesses or home-based companies. This will auto-fill your company contact details with your personal information.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
               <div className="grid grid-cols-1 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Company Name *</label>
@@ -455,15 +579,22 @@ export default function OnboardingPage() {
                   />
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Address</label>
-                  <input
-                    type="text"
-                    value={companyData.address}
-                    onChange={(e) => setCompanyData({ ...companyData, address: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-                  />
-                </div>
+                <AddressAutocomplete
+                  label="Address"
+                  value={companyData.address}
+                  onChange={(value) => setCompanyData({ ...companyData, address: value })}
+                  onPlaceSelected={(components) => {
+                    setCompanyData({
+                      ...companyData,
+                      address: components.address,
+                      city: components.city,
+                      state: components.state,
+                      zipcode: components.zipcode,
+                      country: components.country,
+                    })
+                  }}
+                  placeholder="Start typing company address..."
+                />
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
@@ -522,45 +653,43 @@ export default function OnboardingPage() {
 
               <div className="grid grid-cols-1 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Company Code *</label>
+                  <label className="block text-sm font-medium text-gray-700">Company Code (Optional)</label>
                   <input
                     type="text"
-                    required
                     value={companyCode}
-                    onChange={(e) => setCompanyCode(e.target.value.toUpperCase())}
+                    onChange={(e) => {
+                      const code = e.target.value.toUpperCase()
+                      setCompanyCode(code)
+                      lookupCompany(code)
+                    }}
                     placeholder="Enter the code provided by your employer"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border uppercase font-mono"
                   />
+                  <p className="mt-1 text-sm text-gray-500">
+                    Leave blank to skip this step and add company information later
+                  </p>
+
+                  {matchedCompanyName && (
+                    <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                      <p className="text-sm text-green-800">
+                        <strong>Company found:</strong> {matchedCompanyName}
+                      </p>
+                    </div>
+                  )}
+
+                  {companyCode && !matchedCompanyName && companyCode.length >= 3 && (
+                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+                      <p className="text-sm text-yellow-800">
+                        No company found with this code. Please check the code or leave blank to skip.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Job Title</label>
-                  <input
-                    type="text"
-                    value={jobTitle}
-                    onChange={(e) => setJobTitle(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Department</label>
-                  <input
-                    type="text"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Hire Date</label>
-                  <input
-                    type="date"
-                    value={hireDate}
-                    onChange={(e) => setHireDate(e.target.value)}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
-                  />
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
+                  <p className="text-sm text-blue-800">
+                    <strong>Note:</strong> Your start date will automatically be set to today ({new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}). Job title and department can be assigned by your employer later.
+                  </p>
                 </div>
               </div>
 
@@ -577,7 +706,7 @@ export default function OnboardingPage() {
                   disabled={loading}
                   className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
                 >
-                  {loading ? 'Joining...' : 'Join Company'}
+                  {loading ? (companyCode ? 'Joining...' : 'Continuing...') : (companyCode ? 'Join Company' : 'Skip for Now')}
                 </button>
               </div>
             </form>

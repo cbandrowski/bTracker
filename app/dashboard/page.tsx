@@ -2,429 +2,87 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { Company, Profile, CompanyEmployee } from '@/types/database'
-
-interface EmployeeWithProfile extends CompanyEmployee {
-  profile: Profile
-}
 
 export default function DashboardPage() {
-  const { user, profile, loading, signOut, hasProfile } = useAuth()
+  const { user, profile, loading } = useAuth()
   const router = useRouter()
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [isOwner, setIsOwner] = useState(false)
-  const [employees, setEmployees] = useState<EmployeeWithProfile[]>([])
-  const [loadingData, setLoadingData] = useState(true)
 
   useEffect(() => {
-    console.log('📊 Dashboard: Auth state check', {
-      loading,
-      user: !!user,
-      userId: user?.id,
-      hasProfile,
-      profile: !!profile,
-      profileId: profile?.id,
-    })
+    const redirectToCorrectDashboard = async () => {
+      console.log('📊 Dashboard: Determining user role and redirecting', {
+        loading,
+        user: !!user,
+        userId: user?.id,
+        profile: !!profile,
+        profileId: profile?.id,
+      })
 
-    if (!loading) {
+      if (loading) return
+
       if (!user) {
         console.log('📊 Dashboard: No user, redirecting to login')
         router.push('/login')
-      } else if (!profile) {
-        // Wait a moment for profile to load before redirecting
-        console.log('📊 Dashboard: No profile found, checking if profile exists in DB...')
-
-        const checkProfile = async () => {
-          const { data } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .maybeSingle()
-
-          if (!data) {
-            console.log('📊 Dashboard: Confirmed no profile in DB, redirecting to onboarding')
-            router.push('/onboarding')
-          } else {
-            console.log('📊 Dashboard: Profile exists in DB but not in context, refreshing page')
-            // Profile exists but context doesn't have it, force refresh
-            window.location.reload()
-          }
-        }
-
-        checkProfile()
-      }
-    }
-  }, [user, loading, profile, router, hasProfile])
-
-  useEffect(() => {
-    const fetchCompanyData = async () => {
-      if (!profile?.id) {
-        setLoadingData(false)
         return
       }
 
-      try {
-        // Verify user is authenticated before making queries
-        const {
-          data: { user: authUser },
-          error: userError,
-        } = await supabase.auth.getUser()
+      if (!profile) {
+        console.log('📊 Dashboard: No profile found, checking if profile exists in DB...')
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle()
 
-        console.log('🔐 Dashboard: Auth check', {
-          authUser: !!authUser,
-          userId: authUser?.id,
-          userError: userError?.message
-        })
-
-        if (userError || !authUser) {
-          console.error('❌ Dashboard: User not authenticated', userError)
-          router.push('/login')
-          return
+        if (!data) {
+          console.log('📊 Dashboard: Confirmed no profile in DB, redirecting to onboarding')
+          router.push('/onboarding')
+        } else {
+          console.log('📊 Dashboard: Profile exists in DB but not in context, refreshing page')
+          window.location.reload()
         }
-
-        // Check if user is an owner
-        const { data: ownerData } = await supabase
-          .from('company_owners')
-          .select('company_id, companies(*)')
-          .eq('profile_id', profile.id)
-
-        // Check if user is an employee
-        const { data: employeeData } = await supabase
-          .from('company_employees')
-          .select('company_id, companies(*)')
-          .eq('profile_id', profile.id)
-
-        const ownedCompanies = ownerData?.map(o => o.companies as unknown as Company) || []
-        const employedCompanies = employeeData?.map(e => e.companies as unknown as Company) || []
-
-        // Combine and deduplicate companies
-        const allCompanies = [...ownedCompanies, ...employedCompanies]
-        const uniqueCompanies = allCompanies.filter((company, index, self) =>
-          index === self.findIndex(c => c?.id === company?.id)
-        ).filter(Boolean) as Company[]
-
-        setCompanies(uniqueCompanies)
-        setIsOwner(!!(ownerData && ownerData.length > 0))
-
-        // If user is owner, fetch employees for all owned companies
-        if (ownerData && ownerData.length > 0) {
-          const companyIds = ownerData.map(o => o.company_id)
-
-          const { data: employeesData } = await supabase
-            .from('company_employees')
-            .select(`
-              *,
-              profile:profiles(*)
-            `)
-            .in('company_id', companyIds)
-            .neq('profile_id', profile.id)
-
-          setEmployees((employeesData as any) || [])
-        }
-      } catch (error) {
-        console.error('Error fetching company data:', error)
+        return
       }
 
-      setLoadingData(false)
+      // Check if user is an owner
+      const { data: ownerData } = await supabase
+        .from('company_owners')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .limit(1)
+
+      if (ownerData && ownerData.length > 0) {
+        console.log('📊 Dashboard: User is an owner, redirecting to owner dashboard')
+        router.push('/dashboard/owner')
+        return
+      }
+
+      // Check if user is an employee
+      const { data: employeeData } = await supabase
+        .from('company_employees')
+        .select('id')
+        .eq('profile_id', profile.id)
+        .limit(1)
+
+      if (employeeData && employeeData.length > 0) {
+        console.log('📊 Dashboard: User is an employee, redirecting to employee dashboard')
+        router.push('/dashboard/employee')
+        return
+      }
+
+      // User has no company affiliation, redirect to onboarding
+      console.log('📊 Dashboard: User has no company, redirecting to onboarding')
+      router.push('/onboarding')
     }
 
-    if (profile) {
-      fetchCompanyData()
-    }
-  }, [profile])
+    redirectToCorrectDashboard()
+  }, [user, loading, profile, router])
 
-  if (loading || loadingData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="text-xl text-white">Loading...</div>
-      </div>
-    )
-  }
-
-  if (!user || !profile) {
-    return null
-  }
-
-  const formatPhoneNumber = (phone: string | null) => {
-    if (!phone) return 'N/A'
-    // Basic phone formatting
-    const cleaned = phone.replace(/\D/g, '')
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
-    }
-    return phone
-  }
-
+  // Show loading screen while redirecting
   return (
-    <div className="min-h-screen bg-black py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="bg-gray-900 shadow-lg rounded-lg mb-6 border border-gray-800">
-          <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-gray-800">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-400">
-                Welcome back, {profile.full_name || user.email}!
-              </p>
-            </div>
-            <button
-              onClick={async () => {
-                console.log('🔴 Dashboard: Sign out button clicked')
-                await signOut()
-              }}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* User Profile Info */}
-          <div className="lg:col-span-1">
-            <div className="bg-gray-900 shadow-lg rounded-lg p-6 border border-gray-800">
-              <h2 className="text-lg font-semibold text-white mb-4">Your Profile</h2>
-
-              {user.user_metadata?.avatar_url && (
-                <div className="mb-4 flex justify-center">
-                  <img
-                    src={user.user_metadata.avatar_url}
-                    alt="Profile"
-                    className="h-24 w-24 rounded-full"
-                  />
-                </div>
-              )}
-
-              <dl className="space-y-3">
-                <div>
-                  <dt className="text-sm font-medium text-gray-400">Name</dt>
-                  <dd className="mt-1 text-sm text-white">{profile.full_name || 'Not provided'}</dd>
-                </div>
-
-                <div>
-                  <dt className="text-sm font-medium text-gray-400">Email</dt>
-                  <dd className="mt-1 text-sm text-white">{user.email}</dd>
-                </div>
-
-                <div>
-                  <dt className="text-sm font-medium text-gray-400">Phone</dt>
-                  <dd className="mt-1 text-sm text-white">{formatPhoneNumber(profile.phone)}</dd>
-                </div>
-
-                {profile.address && (
-                  <div>
-                    <dt className="text-sm font-medium text-gray-400">Address</dt>
-                    <dd className="mt-1 text-sm text-white">
-                      {profile.address}
-                      {profile.address_line_2 && <><br />{profile.address_line_2}</>}
-                      {profile.city && profile.state && (
-                        <>
-                          <br />
-                          {profile.city}, {profile.state} {profile.zipcode}
-                        </>
-                      )}
-                    </dd>
-                  </div>
-                )}
-
-                <div>
-                  <dt className="text-sm font-medium text-gray-400">Role</dt>
-                  <dd className="mt-1">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      isOwner ? 'bg-blue-600 text-white' : 'bg-green-600 text-white'
-                    }`}>
-                      {isOwner ? 'Business Owner' : 'Employee'}
-                    </span>
-                  </dd>
-                </div>
-              </dl>
-            </div>
-          </div>
-
-          {/* Company Info */}
-          <div className="lg:col-span-2">
-            {companies.length > 0 ? (
-              <div className="space-y-6">
-                {companies.map((company) => (
-                  <div key={company.id} className="bg-gray-900 shadow-lg rounded-lg p-6 border border-gray-800">
-                    <h2 className="text-lg font-semibold text-white mb-4">Company Information</h2>
-
-                    <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <dt className="text-sm font-medium text-gray-400">Company Name</dt>
-                        <dd className="mt-1 text-sm text-white font-semibold">{company.name}</dd>
-                      </div>
-
-                      <div>
-                        <dt className="text-sm font-medium text-gray-400">Company Code</dt>
-                        <dd className="mt-1">
-                          <span className="inline-flex items-center px-3 py-1 rounded-md text-sm font-mono font-semibold bg-blue-600 text-white">
-                            {company.company_code}
-                          </span>
-                        </dd>
-                      </div>
-
-                      {company.phone && (
-                        <div>
-                          <dt className="text-sm font-medium text-gray-400">Phone</dt>
-                          <dd className="mt-1 text-sm text-white">{formatPhoneNumber(company.phone)}</dd>
-                        </div>
-                      )}
-
-                      {company.email && (
-                        <div>
-                          <dt className="text-sm font-medium text-gray-400">Email</dt>
-                          <dd className="mt-1 text-sm text-white">{company.email}</dd>
-                        </div>
-                      )}
-
-                      {company.website && (
-                        <div className="sm:col-span-2">
-                          <dt className="text-sm font-medium text-gray-400">Website</dt>
-                          <dd className="mt-1 text-sm text-white">
-                            <a href={company.website} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">
-                              {company.website}
-                            </a>
-                          </dd>
-                        </div>
-                      )}
-
-                      {company.address && (
-                        <div className="sm:col-span-2">
-                          <dt className="text-sm font-medium text-gray-400">Address</dt>
-                          <dd className="mt-1 text-sm text-white">
-                            {company.address}
-                            {company.address_line_2 && <><br />{company.address_line_2}</>}
-                            {company.city && company.state && (
-                              <>
-                                <br />
-                                {company.city}, {company.state} {company.zipcode}
-                              </>
-                            )}
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-
-                    {isOwner && (
-                      <div className="mt-6 p-4 bg-blue-900 rounded-md border border-blue-700">
-                        <p className="text-sm text-blue-100">
-                          <strong>Share your company code:</strong> Give the code <strong>{company.company_code}</strong> to your employees so they can join your company.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Employees List (Only for Owners) */}
-                {isOwner && (
-                  <div className="bg-gray-900 shadow-lg rounded-lg p-6 border border-gray-800">
-                    <h2 className="text-lg font-semibold text-white mb-4">
-                      Team Members ({employees.length})
-                    </h2>
-
-                    {employees.length === 0 ? (
-                      <div className="text-center py-8">
-                        <svg
-                          className="mx-auto h-12 w-12 text-gray-600"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                          />
-                        </svg>
-                        <p className="mt-2 text-sm text-gray-400">No employees yet</p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Share your company code with team members to get started
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="overflow-hidden">
-                        <table className="min-w-full divide-y divide-gray-800">
-                          <thead className="bg-gray-800">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Name
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Phone
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Job Title
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Hire Date
-                              </th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                                Status
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-gray-900 divide-y divide-gray-800">
-                            {employees.map((employee) => (
-                              <tr key={employee.id}>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                                  {employee.profile.full_name}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                                  {formatPhoneNumber(employee.profile.phone)}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                                  {employee.job_title || 'N/A'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                                  {employee.hire_date
-                                    ? new Date(employee.hire_date).toLocaleDateString('en-US', {
-                                        month: 'short',
-                                        day: 'numeric',
-                                        year: 'numeric'
-                                      })
-                                    : 'N/A'}
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    employee.employment_status === 'active'
-                                      ? 'bg-green-600 text-white'
-                                      : employee.employment_status === 'on_leave'
-                                      ? 'bg-yellow-600 text-white'
-                                      : 'bg-red-600 text-white'
-                                  }`}>
-                                    {employee.employment_status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="bg-gray-900 shadow-lg rounded-lg p-6 border border-gray-800">
-                <p className="text-gray-400">No company information available</p>
-                <p className="text-gray-500 text-sm mt-2">
-                  It looks like you haven't joined or created a company yet.
-                </p>
-                <button
-                  onClick={() => router.push('/onboarding')}
-                  className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Complete Onboarding
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="text-xl text-white">Redirecting...</div>
     </div>
   )
 }
