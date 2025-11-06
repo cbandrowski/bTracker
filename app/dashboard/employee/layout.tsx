@@ -10,6 +10,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   const { user, profile, loading } = useAuth()
   const router = useRouter()
   const [isEmployee, setIsEmployee] = useState<boolean | null>(null)
+  const [approvalStatus, setApprovalStatus] = useState<'approved' | 'pending' | 'rejected' | null>(null)
 
   useEffect(() => {
     const verifyEmployee = async () => {
@@ -38,15 +39,24 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
         return
       }
 
-      // Check if user is an employee
+      // Check if user is an employee and approved
       const { data: employeeData } = await supabase
         .from('company_employees')
-        .select('id')
+        .select('id, approval_status')
         .eq('profile_id', profile.id)
         .limit(1)
 
       if (employeeData && employeeData.length > 0) {
-        setIsEmployee(true)
+        const employee = employeeData[0] as any
+        setApprovalStatus(employee.approval_status)
+
+        // Check if employee is approved
+        if (employee.approval_status === 'approved') {
+          setIsEmployee(true)
+        } else {
+          // Pending or rejected - show status screen
+          setIsEmployee(false)
+        }
       } else {
         // Not an employee either, redirect to onboarding
         router.push('/onboarding')
@@ -60,6 +70,68 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
     return (
       <div className="min-h-screen flex items-center justify-center bg-black">
         <div className="text-xl text-white">Loading...</div>
+      </div>
+    )
+  }
+
+  // Show pending approval screen
+  if (approvalStatus === 'pending') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="max-w-md mx-auto text-center">
+          <div className="bg-yellow-900/20 border-2 border-yellow-600 rounded-lg p-8">
+            <svg className="w-16 h-16 text-yellow-400 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            </svg>
+            <h2 className="text-2xl font-bold text-yellow-400 mb-2">Pending Approval</h2>
+            <p className="text-gray-300 mb-4">
+              Your account is waiting for approval from your company administrator.
+            </p>
+            <p className="text-gray-400 text-sm">
+              You'll receive access once your account has been approved.
+            </p>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut()
+                router.push('/login')
+              }}
+              className="mt-6 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show rejected screen
+  if (approvalStatus === 'rejected') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black">
+        <div className="max-w-md mx-auto text-center">
+          <div className="bg-red-900/20 border-2 border-red-600 rounded-lg p-8">
+            <svg className="w-16 h-16 text-red-400 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <h2 className="text-2xl font-bold text-red-400 mb-2">Access Denied</h2>
+            <p className="text-gray-300 mb-4">
+              Your account access has been denied by your company administrator.
+            </p>
+            <p className="text-gray-400 text-sm">
+              Please contact your administrator for more information.
+            </p>
+            <button
+              onClick={async () => {
+                await supabase.auth.signOut()
+                router.push('/login')
+              }}
+              className="mt-6 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+            >
+              Sign Out
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
@@ -93,6 +165,15 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Schedule',
+      link: '/dashboard/employee/schedule',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       ),
     },

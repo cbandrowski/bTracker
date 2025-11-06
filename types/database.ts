@@ -45,6 +45,8 @@ export interface CompanyOwner {
 }
 
 export type EmploymentStatus = 'active' | 'terminated' | 'on_leave'
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
+export type WorkStatus = 'available' | 'inactive' | 'vacation' | 'sick'
 
 export interface CompanyEmployee {
   id: string  // uuid
@@ -55,6 +57,8 @@ export interface CompanyEmployee {
   job_title: string | null
   department: string | null
   employment_status: EmploymentStatus
+  approval_status: ApprovalStatus
+  work_status: WorkStatus
   is_manager: boolean
   created_at: string
   updated_at: string

@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { JobAssignment, Job, CompanyEmployee, AssignmentStatus } from '@/types/database'
+import { JobAssignment, Job, AssignmentStatus } from '@/types/database'
 
 interface AssignmentWithDetails extends JobAssignment {
   job?: Job & {
@@ -11,29 +11,21 @@ interface AssignmentWithDetails extends JobAssignment {
       name: string
     }
   }
-  employee?: CompanyEmployee & {
-    profile?: {
-      full_name: string
-      email: string
-    }
-  }
 }
 
 type ViewMode = 'week' | 'month'
 type StatusFilter = 'all' | 'upcoming' | 'in_progress' | 'completed'
 
-export default function SchedulePage() {
+export default function EmployeeSchedulePage() {
   const { profile } = useAuth()
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([])
-  const [employees, setEmployees] = useState<Array<{ id: string; full_name: string }>>([])
   const [loading, setLoading] = useState(true)
-  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [employeeId, setEmployeeId] = useState<string | null>(null)
 
   // View and filter states
   const [viewMode, setViewMode] = useState<ViewMode>('week')
   const [currentDate, setCurrentDate] = useState(new Date())
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
-  const [employeeFilter, setEmployeeFilter] = useState<string>('all')
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null)
 
   useEffect(() => {
@@ -44,41 +36,23 @@ export default function SchedulePage() {
       }
 
       try {
-        // Get company
-        const { data: ownerData } = await supabase
-          .from('company_owners')
-          .select('company_id')
+        // Get employee record for current user
+        const { data: employeeData } = await supabase
+          .from('company_employees')
+          .select('id, company_id')
           .eq('profile_id', profile.id)
+          .eq('employment_status', 'active')
+          .eq('approval_status', 'approved')
           .single()
 
-        if (!ownerData) {
+        if (!employeeData) {
           setLoading(false)
           return
         }
 
-        setCompanyId(ownerData.company_id)
+        setEmployeeId(employeeData.id)
 
-        // Fetch employees for filter dropdown
-        const { data: employeesData } = await supabase
-          .from('company_employees')
-          .select(`
-            id,
-            profile:profiles(full_name)
-          `)
-          .eq('company_id', ownerData.company_id)
-          .eq('employment_status', 'active')
-          .eq('approval_status', 'approved')
-          .order('profile(full_name)')
-
-        if (employeesData) {
-          const formattedEmployees = employeesData.map((emp: any) => ({
-            id: emp.id,
-            full_name: emp.profile?.full_name || 'Unknown'
-          }))
-          setEmployees(formattedEmployees)
-        }
-
-        // Fetch assignments with job and employee details
+        // Fetch only assignments for this employee
         const { data: assignmentsData, error } = await supabase
           .from('job_assignments')
           .select(`
@@ -86,13 +60,9 @@ export default function SchedulePage() {
             job:jobs(
               *,
               customer:customers(name)
-            ),
-            employee:company_employees(
-              *,
-              profile:profiles(full_name, email)
             )
           `)
-          .eq('company_id', ownerData.company_id)
+          .eq('employee_id', employeeData.id)
           .order('service_start_at', { ascending: true })
 
         if (error) {
@@ -112,7 +82,7 @@ export default function SchedulePage() {
     }
   }, [profile])
 
-  // Filter assignments based on status and employee
+  // Filter assignments based on status
   const filteredAssignments = useMemo(() => {
     return assignments.filter(assignment => {
       // Status filter
@@ -122,12 +92,9 @@ export default function SchedulePage() {
         if (statusFilter === 'completed' && assignment.assignment_status !== 'done') return false
       }
 
-      // Employee filter
-      if (employeeFilter !== 'all' && assignment.employee_id !== employeeFilter) return false
-
       return true
     })
-  }, [assignments, statusFilter, employeeFilter])
+  }, [assignments, statusFilter])
 
   // Get calendar data based on view mode
   const calendarData = useMemo(() => {
@@ -142,10 +109,6 @@ export default function SchedulePage() {
       return new Date(date.getFullYear(), date.getMonth(), 1)
     }
 
-    const endOfMonth = (date: Date) => {
-      return new Date(date.getFullYear(), date.getMonth() + 1, 0)
-    }
-
     if (viewMode === 'week') {
       const start = startOfWeek(currentDate)
       const days = []
@@ -158,7 +121,6 @@ export default function SchedulePage() {
     } else {
       // Month view
       const start = startOfMonth(currentDate)
-      const end = endOfMonth(currentDate)
       const firstDayOfWeek = start.getDay()
 
       // Start from the Sunday before the first of the month
@@ -228,6 +190,14 @@ export default function SchedulePage() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   }
 
+  const formatTimeRange = (startString: string | null, endString: string | null) => {
+    if (!startString) return 'No time set'
+    const start = formatTime(startString)
+    if (!endString) return start
+    const end = formatTime(endString)
+    return `${start} - ${end}`
+  }
+
   const getStatusColor = (status: AssignmentStatus) => {
     switch (status) {
       case 'assigned':
@@ -243,6 +213,21 @@ export default function SchedulePage() {
     }
   }
 
+  const getStatusBadge = (status: AssignmentStatus) => {
+    switch (status) {
+      case 'assigned':
+        return 'Scheduled'
+      case 'in_progress':
+        return 'In Progress'
+      case 'done':
+        return 'Completed'
+      case 'cancelled':
+        return 'Cancelled'
+      default:
+        return status
+    }
+  }
+
   const isToday = (date: Date) => {
     const today = new Date()
     return date.toDateString() === today.toDateString()
@@ -255,7 +240,18 @@ export default function SchedulePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-white">Loading schedule...</div>
+        <div className="text-white">Loading your schedule...</div>
+      </div>
+    )
+  }
+
+  if (!employeeId) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="text-center">
+          <div className="text-red-400 text-lg mb-2">No Employee Record Found</div>
+          <div className="text-gray-400">Please contact your administrator.</div>
+        </div>
       </div>
     )
   }
@@ -265,22 +261,13 @@ export default function SchedulePage() {
       {/* Header with filters */}
       <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <h2 className="text-2xl font-semibold text-white">Schedule</h2>
+          <div>
+            <h2 className="text-2xl font-semibold text-white">My Schedule</h2>
+            <p className="text-sm text-gray-400 mt-1">View your assigned jobs and appointments</p>
+          </div>
 
           {/* Filters */}
           <div className="flex flex-wrap gap-4">
-            {/* Employee Filter */}
-            <select
-              value={employeeFilter}
-              onChange={(e) => setEmployeeFilter(e.target.value)}
-              className="px-4 py-2 bg-gray-700 text-white rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="all">All Employees</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.full_name}</option>
-              ))}
-            </select>
-
             {/* Status Filter */}
             <select
               value={statusFilter}
@@ -316,6 +303,28 @@ export default function SchedulePage() {
                 Month
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-yellow-900/20 border border-yellow-600 rounded-lg p-4">
+          <div className="text-yellow-400 text-sm font-semibold">Upcoming</div>
+          <div className="text-2xl font-bold text-white mt-1">
+            {assignments.filter(a => a.assignment_status === 'assigned').length}
+          </div>
+        </div>
+        <div className="bg-blue-900/20 border border-blue-600 rounded-lg p-4">
+          <div className="text-blue-400 text-sm font-semibold">In Progress</div>
+          <div className="text-2xl font-bold text-white mt-1">
+            {assignments.filter(a => a.assignment_status === 'in_progress').length}
+          </div>
+        </div>
+        <div className="bg-green-900/20 border border-green-600 rounded-lg p-4">
+          <div className="text-green-400 text-sm font-semibold">Completed</div>
+          <div className="text-2xl font-bold text-white mt-1">
+            {assignments.filter(a => a.assignment_status === 'done').length}
           </div>
         </div>
       </div>
@@ -358,7 +367,7 @@ export default function SchedulePage() {
       {/* Calendar Grid */}
       <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
         {/* Day headers */}
-        <div className={`grid ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-7'} gap-2 mb-4`}>
+        <div className="grid grid-cols-7 gap-2 mb-4">
           {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
             <div key={day} className="text-center font-semibold text-gray-400 py-2">
               {day}
@@ -367,7 +376,7 @@ export default function SchedulePage() {
         </div>
 
         {/* Calendar days */}
-        <div className={`grid ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-7'} gap-2`}>
+        <div className="grid grid-cols-7 gap-2">
           {calendarData.map((day, index) => {
             const dayAssignments = getAssignmentsForDay(day)
             const isTodayDate = isToday(day)
@@ -403,14 +412,16 @@ export default function SchedulePage() {
                       <div className="font-semibold truncate">
                         {assignment.service_start_at && formatTime(assignment.service_start_at)}
                       </div>
-                      <div className="truncate">{assignment.job?.title || 'Untitled Job'}</div>
+                      <div className="truncate font-medium">{assignment.job?.title || 'Untitled Job'}</div>
                       {viewMode === 'week' && (
                         <>
-                          <div className="truncate text-gray-400">
-                            {assignment.employee?.profile?.full_name || 'Unknown'}
-                          </div>
-                          <div className="truncate text-gray-400">
+                          <div className="truncate text-gray-400 mt-1">
                             {assignment.job?.customer?.name || 'No customer'}
+                          </div>
+                          <div className="mt-1">
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-800">
+                              {getStatusBadge(assignment.assignment_status)}
+                            </span>
                           </div>
                         </>
                       )}
@@ -433,6 +444,56 @@ export default function SchedulePage() {
           })}
         </div>
       </div>
+
+      {/* Upcoming Assignments List */}
+      {filteredAssignments.filter(a => {
+        if (!a.service_start_at) return false
+        return new Date(a.service_start_at) >= new Date()
+      }).length > 0 && (
+        <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+          <h3 className="text-lg font-semibold text-white mb-4">Upcoming Assignments</h3>
+          <div className="space-y-3">
+            {filteredAssignments
+              .filter(a => {
+                if (!a.service_start_at) return false
+                return new Date(a.service_start_at) >= new Date()
+              })
+              .slice(0, 5)
+              .map(assignment => (
+                <div
+                  key={assignment.id}
+                  className="bg-gray-900 border border-gray-700 rounded-lg p-4"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h4 className="font-semibold text-white">{assignment.job?.title || 'Untitled Job'}</h4>
+                        <span className={`text-xs px-2 py-1 rounded border ${getStatusColor(assignment.assignment_status)}`}>
+                          {getStatusBadge(assignment.assignment_status)}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-400 space-y-1">
+                        <div>📅 {new Date(assignment.service_start_at!).toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })}</div>
+                        <div>🕐 {formatTimeRange(assignment.service_start_at, assignment.service_end_at)}</div>
+                        {assignment.job?.customer?.name && (
+                          <div>👤 {assignment.job.customer.name}</div>
+                        )}
+                        {assignment.job?.service_address && (
+                          <div>📍 {assignment.job.service_address}</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Job Details Panel */}
       {selectedAssignment && (
@@ -459,9 +520,7 @@ export default function SchedulePage() {
                   </h4>
                   <div className="flex items-center gap-2">
                     <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(selectedAssignment.assignment_status)}`}>
-                      {selectedAssignment.assignment_status === 'assigned' ? 'Scheduled' :
-                       selectedAssignment.assignment_status === 'in_progress' ? 'In Progress' :
-                       selectedAssignment.assignment_status === 'done' ? 'Completed' : 'Cancelled'}
+                      {getStatusBadge(selectedAssignment.assignment_status)}
                     </span>
                     {selectedAssignment.job?.status && (
                       <span className="px-3 py-1 rounded-full text-sm bg-gray-700 text-gray-300">
@@ -504,29 +563,11 @@ export default function SchedulePage() {
               </div>
             </div>
 
-            {/* Employee and Customer */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="bg-gray-900 rounded-lg p-4">
-                <div className="text-sm font-semibold text-gray-400 mb-2">👤 Assigned Employee</div>
-                <div className="text-white font-medium">
-                  {selectedAssignment.employee?.profile?.full_name || 'Unknown'}
-                </div>
-                {selectedAssignment.employee?.profile?.email && (
-                  <div className="text-sm text-gray-400 mt-1">
-                    {selectedAssignment.employee.profile.email}
-                  </div>
-                )}
-                {selectedAssignment.employee?.job_title && (
-                  <div className="text-sm text-gray-400 mt-1">
-                    {selectedAssignment.employee.job_title}
-                  </div>
-                )}
-              </div>
-              <div className="bg-gray-900 rounded-lg p-4">
-                <div className="text-sm font-semibold text-gray-400 mb-2">🏢 Customer</div>
-                <div className="text-white font-medium">
-                  {selectedAssignment.job?.customer?.name || 'No customer'}
-                </div>
+            {/* Customer */}
+            <div className="bg-gray-900 rounded-lg p-4">
+              <div className="text-sm font-semibold text-gray-400 mb-2">🏢 Customer</div>
+              <div className="text-white font-medium">
+                {selectedAssignment.job?.customer?.name || 'No customer'}
               </div>
             </div>
 
@@ -584,7 +625,7 @@ export default function SchedulePage() {
         <div className="flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-yellow-900/30 border border-yellow-600"></div>
-            <span className="text-gray-300">Upcoming (Assigned)</span>
+            <span className="text-gray-300">Scheduled</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-blue-900/30 border border-blue-600"></div>

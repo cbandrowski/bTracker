@@ -16,6 +16,7 @@ export default function CustomersPage() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [sortColumn, setSortColumn] = useState<'name' | 'billing_city' | 'service_city' | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -142,21 +143,40 @@ export default function CustomersPage() {
     setSubmitting(true)
 
     try {
-      const customerData = {
-        company_id: companyId,
-        ...formData
+      if (editingCustomer) {
+        // Update existing customer
+        const { data, error } = await supabase
+          .from('customers')
+          .update(formData)
+          .eq('id', editingCustomer.id)
+          .select()
+          .single()
+
+        if (error) throw error
+
+        setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? data as Customer : c))
+        alert('Customer updated successfully!')
+      } else {
+        // Create new customer
+        const customerData = {
+          company_id: companyId,
+          ...formData
+        }
+
+        const { data, error } = await supabase
+          .from('customers')
+          .insert([customerData])
+          .select()
+          .single()
+
+        if (error) throw error
+
+        setCustomers(prev => [data as Customer, ...prev])
+        alert('Customer created successfully!')
       }
 
-      const { data, error } = await supabase
-        .from('customers')
-        .insert([customerData])
-        .select()
-        .single()
-
-      if (error) throw error
-
-      setCustomers(prev => [data as Customer, ...prev])
       setShowForm(false)
+      setEditingCustomer(null)
 
       // Reset form
       setFormData({
@@ -178,14 +198,62 @@ export default function CustomersPage() {
         same_as_billing: false,
         notes: ''
       })
-
-      alert('Customer created successfully!')
     } catch (error) {
-      console.error('Error creating customer:', error)
-      alert('Failed to create customer. Please try again.')
+      console.error('Error saving customer:', error)
+      alert(`Failed to ${editingCustomer ? 'update' : 'create'} customer. Please try again.`)
     }
 
     setSubmitting(false)
+  }
+
+  const handleEditCustomer = (customer: Customer) => {
+    setEditingCustomer(customer)
+    setFormData({
+      name: customer.name,
+      phone: customer.phone || '',
+      email: customer.email || '',
+      billing_address: customer.billing_address || '',
+      billing_address_line_2: customer.billing_address_line_2 || '',
+      billing_city: customer.billing_city || '',
+      billing_state: customer.billing_state || '',
+      billing_zipcode: customer.billing_zipcode || '',
+      billing_country: customer.billing_country || 'USA',
+      service_address: customer.service_address || '',
+      service_address_line_2: customer.service_address_line_2 || '',
+      service_city: customer.service_city || '',
+      service_state: customer.service_state || '',
+      service_zipcode: customer.service_zipcode || '',
+      service_country: customer.service_country || 'USA',
+      same_as_billing: customer.same_as_billing,
+      notes: customer.notes || ''
+    })
+    setShowForm(true)
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleCancelEdit = () => {
+    setEditingCustomer(null)
+    setShowForm(false)
+    setFormData({
+      name: '',
+      phone: '',
+      email: '',
+      billing_address: '',
+      billing_address_line_2: '',
+      billing_city: '',
+      billing_state: '',
+      billing_zipcode: '',
+      billing_country: 'USA',
+      service_address: '',
+      service_address_line_2: '',
+      service_city: '',
+      service_state: '',
+      service_zipcode: '',
+      service_country: 'USA',
+      same_as_billing: false,
+      notes: ''
+    })
   }
 
   const formatPhoneNumber = (phone: string | null) => {
@@ -281,10 +349,25 @@ export default function CustomersPage() {
           </button>
         </div>
 
-        {/* Create Customer Form */}
+        {/* Create/Edit Customer Form */}
         {showForm && (
           <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-            <h3 className="text-md font-semibold text-white mb-4">New Customer</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-md font-semibold text-white">
+                {editingCustomer ? 'Edit Customer' : 'New Customer'}
+              </h3>
+              {editingCustomer && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="text-gray-400 hover:text-white"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -498,7 +581,7 @@ export default function CustomersPage() {
                 disabled={submitting}
                 className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
               >
-                {submitting ? 'Creating...' : 'Create Customer'}
+                {submitting ? (editingCustomer ? 'Updating...' : 'Creating...') : (editingCustomer ? 'Update Customer' : 'Create Customer')}
               </button>
             </div>
           </form>
@@ -614,12 +697,20 @@ export default function CustomersPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => handleCreateJob(customer)}
-                        className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 text-xs font-medium"
-                      >
-                        Create Job
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEditCustomer(customer)}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleCreateJob(customer)}
+                          className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 text-xs font-medium"
+                        >
+                          Create Job
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
