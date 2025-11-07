@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { JobAssignment, JobWithCustomer } from '@/types/database'
+import { JobAssignment, JobWithCustomer, AssignmentStatus } from '@/types/database'
 
 interface JobAssignmentWithJob extends JobAssignment {
   job?: JobWithCustomer
@@ -13,6 +13,41 @@ export default function EmployeeDashboardPage() {
   const { profile } = useAuth()
   const [assignments, setAssignments] = useState<JobAssignmentWithJob[]>([])
   const [loadingData, setLoadingData] = useState(true)
+
+  const handleChangeStatus = async (assignmentId: string, newStatus: AssignmentStatus) => {
+    try {
+      const updateData: any = {
+        assignment_status: newStatus,
+      }
+
+      if (newStatus === 'done') {
+        updateData.worker_confirmed_done_at = new Date().toISOString()
+      }
+
+      const { error } = await supabase
+        .from('job_assignments')
+        .update(updateData)
+        .eq('id', assignmentId)
+
+      if (error) {
+        console.error('Error updating status:', error)
+        alert(`Error: ${error.message}`)
+        return
+      }
+
+      // Update local state
+      setAssignments(prev =>
+        prev.map(a =>
+          a.id === assignmentId
+            ? { ...a, assignment_status: newStatus, worker_confirmed_done_at: newStatus === 'done' ? new Date().toISOString() : a.worker_confirmed_done_at }
+            : a
+        )
+      )
+    } catch (error) {
+      console.error('Error:', error)
+      alert(`Error: ${error}`)
+    }
+  }
 
   useEffect(() => {
     const fetchAssignments = async () => {
@@ -152,6 +187,13 @@ export default function EmployeeDashboardPage() {
                         <p className="text-gray-500 text-xs whitespace-pre-line">{assignment.job.tasks_to_complete}</p>
                       </div>
                     )}
+                    {/* Start Button */}
+                    <button
+                      onClick={() => handleChangeStatus(assignment.id, 'in_progress')}
+                      className="mt-3 w-full px-3 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm font-medium rounded-md transition-colors"
+                    >
+                      Start Job →
+                    </button>
                   </div>
                 ))
               )}
@@ -216,6 +258,13 @@ export default function EmployeeDashboardPage() {
                         <p className="text-gray-500 text-xs whitespace-pre-line">{assignment.job.tasks_to_complete}</p>
                       </div>
                     )}
+                    {/* Complete Button */}
+                    <button
+                      onClick={() => handleChangeStatus(assignment.id, 'done')}
+                      className="mt-3 w-full px-3 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-md transition-colors"
+                    >
+                      Mark Complete →
+                    </button>
                   </div>
                 ))
               )}

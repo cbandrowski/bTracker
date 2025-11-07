@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { Company, Profile } from '@/types/database'
+import { Company } from '@/types/database'
 
 const formatPhoneNumber = (phone: string | null) => {
   if (!phone) return 'N/A'
@@ -16,7 +16,7 @@ const formatPhoneNumber = (phone: string | null) => {
 }
 
 export default function OwnerDashboardPage() {
-  const { user, profile, loading, signOut, hasProfile } = useAuth()
+  const { user, profile, loading, hasProfile } = useAuth()
   const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
   const [loadingData, setLoadingData] = useState(true)
@@ -107,31 +107,7 @@ export default function OwnerDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-black py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="bg-gray-900 shadow-lg rounded-lg mb-6 border border-gray-800">
-          <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-gray-800">
-            <div>
-              <h1 className="text-2xl font-bold text-white">Owner Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-400">
-                Welcome back, {profile.full_name || user.email}!
-              </p>
-            </div>
-            <button
-              onClick={async () => {
-                console.log('Dashboard: Sign out button clicked')
-                await signOut()
-              }}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
-            >
-              Sign Out
-            </button>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="space-y-6">
+    <div className="space-y-6">
           {/* User Profile Info */}
           <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
             <h2 className="text-lg font-semibold text-white mb-4">Your Profile</h2>
@@ -275,8 +251,6 @@ export default function OwnerDashboardPage() {
               </button>
             </div>
           )}
-        </div>
-      </div>
     </div>
   )
 }

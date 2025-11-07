@@ -623,7 +623,10 @@ export default function CustomersPage() {
                     </div>
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Contact
+                    Phone
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                    Email
                   </th>
                   <th
                     className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-800 transition-colors"
@@ -655,10 +658,10 @@ export default function CustomersPage() {
                       {customer.name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      <div>{formatPhoneNumber(customer.phone)}</div>
-                      {customer.email && (
-                        <div className="text-xs text-gray-400">{customer.email}</div>
-                      )}
+                      {customer.phone ? formatPhoneNumber(customer.phone) : <span className="text-gray-500 italic">Empty</span>}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                      {customer.email || <span className="text-gray-500 italic">Empty</span>}
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-300">
                       {customer.billing_address ? (
