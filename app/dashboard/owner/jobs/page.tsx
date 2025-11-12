@@ -2,10 +2,10 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { Job, Customer, JobWithCustomer } from '@/types/database'
+import { Customer, JobWithCustomer } from '@/types/database'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
+import { jobsService, companiesService } from '@/lib/services'
 
 export default function JobsPage() {
   const { profile } = useAuth()
@@ -42,30 +42,25 @@ export default function JobsPage() {
 
       try {
         // Get owned companies
-        const { data: ownerData } = await supabase
-          .from('company_owners')
-          .select('company_id')
-          .eq('profile_id', profile.id)
+        const companiesResponse = await companiesService.getAll()
 
-        if (!ownerData || ownerData.length === 0) {
+        if (companiesResponse.error || !companiesResponse.data || companiesResponse.data.length === 0) {
           setLoadingData(false)
           return
         }
 
-        const companyIds = ownerData.map(o => o.company_id)
-        setCompanyId(companyIds[0])
+        setCompanyId(companiesResponse.data[0].id)
 
-        // Fetch jobs with customer info
-        const { data: jobsData } = await supabase
-          .from('jobs')
-          .select(`
-            *,
-            customer:customers(*)
-          `)
-          .in('company_id', companyIds)
-          .order('created_at', { ascending: false })
+        // Fetch jobs via API
+        const response = await jobsService.getAll()
 
-        setJobs((jobsData as any) || [])
+        if (response.error) {
+          console.error('Error fetching jobs:', response.error)
+          setLoadingData(false)
+          return
+        }
+
+        setJobs(response.data || [])
       } catch (error) {
         console.error('Error fetching jobs:', error)
       }
@@ -171,18 +166,11 @@ export default function JobsPage() {
         status: 'upcoming'
       }
 
-      const { data, error } = await supabase
-        .from('jobs')
-        .insert([jobData])
-        .select(`
-          *,
-          customer:customers(*)
-        `)
-        .single()
+      const response = await jobsService.create(jobData as any)
 
-      if (error) throw error
+      if (response.error) throw new Error(response.error)
 
-      setJobs(prev => [data as any, ...prev])
+      setJobs(prev => [response.data!, ...prev])
       setShowForm(false)
 
       // Reset form

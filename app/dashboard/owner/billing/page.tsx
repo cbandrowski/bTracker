@@ -1,38 +1,190 @@
 'use client'
 
-export default function BillingPage() {
-  return (
-    <div className="space-y-6">
-      <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
-        <h2 className="text-lg font-semibold text-white mb-4">Billing</h2>
+import { useState, useEffect } from 'react'
+import { BillingStatsCards } from '@/components/billing/BillingStatsCards'
+import { RecentInvoicesList } from '@/components/billing/RecentInvoicesList'
+import { CustomersBalanceList } from '@/components/billing/CustomersBalanceList'
+import { UnbilledJobsTable } from '@/components/billing/UnbilledJobsTable'
+import {
+  useBillingStats,
+  useRecentInvoices,
+  useCustomersWithBalance,
+} from '@/hooks/useBillingOverview'
+import { Button } from '@/components/ui/button'
+import { Plus, RefreshCw } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
-        <div className="flex items-center justify-center py-12">
-          <div className="text-center">
-            <svg
-              className="mx-auto h-16 w-16 text-blue-500 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"
-              />
-            </svg>
-            <h3 className="text-xl font-semibold text-white mb-2">In Progress</h3>
-            <p className="text-gray-400 max-w-md">
-              The billing feature is currently under development. You'll be able to manage invoices, payments, billing history, and financial reports here.
+export default function BillingPage() {
+  const router = useRouter()
+  const billingStats = useBillingStats()
+  const recentInvoices = useRecentInvoices(10)
+  const customersBalance = useCustomersWithBalance()
+  const [unbilledJobs, setUnbilledJobs] = useState<any[]>([])
+  const [unbilledLoading, setUnbilledLoading] = useState(true)
+
+  const fetchUnbilledJobs = async () => {
+    try {
+      setUnbilledLoading(true)
+      const response = await fetch('/api/billing/unbilled-jobs')
+      if (response.ok) {
+        const data = await response.json()
+        setUnbilledJobs(data.jobs || [])
+      }
+    } catch (error) {
+      console.error('Error fetching unbilled jobs:', error)
+    } finally {
+      setUnbilledLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchUnbilledJobs()
+  }, [])
+
+  const handleRefresh = () => {
+    billingStats.refresh()
+    recentInvoices.refresh()
+    customersBalance.refresh()
+    fetchUnbilledJobs()
+  }
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Billing Overview</h1>
+          <p className="text-sm text-gray-400 mt-1">
+            Manage invoices, payments, and customer balances
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={billingStats.loading || recentInvoices.loading || customersBalance.loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${
+              (billingStats.loading || recentInvoices.loading || customersBalance.loading) ? 'animate-spin' : ''
+            }`} />
+            Refresh
+          </Button>
+          <Button
+            onClick={() => router.push('/dashboard/owner/billing/customers')}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Invoice
+          </Button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <BillingStatsCards stats={billingStats.data} loading={billingStats.loading} />
+
+      {/* Unbilled Jobs Table */}
+      <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Unbilled Jobs
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Completed jobs ready to be invoiced. Click a row to create an invoice.
             </p>
-            <div className="mt-6 inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md">
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              Coming Soon
-            </div>
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/dashboard/owner/billing/customers')}
+          >
+            View All Customers
+          </Button>
+        </div>
+        <UnbilledJobsTable jobs={unbilledJobs} loading={unbilledLoading} />
+      </div>
+
+      {/* Two Column Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Invoices */}
+        <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Recent Invoices
+            </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/dashboard/owner/billing/customers')}
+            >
+              View All
+            </Button>
+          </div>
+          <RecentInvoicesList
+            invoices={recentInvoices.data}
+            loading={recentInvoices.loading}
+          />
+        </div>
+
+        {/* Customers with Outstanding Balance */}
+        <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              Outstanding Balances
+            </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/dashboard/owner/billing/customers')}
+            >
+              View All
+            </Button>
+          </div>
+          <CustomersBalanceList
+            customers={customersBalance.data}
+            loading={customersBalance.loading}
+          />
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          Quick Actions
+        </h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center"
+            onClick={() => router.push('/dashboard/owner/billing/customers')}
+          >
+            <Plus className="h-6 w-6 mb-2" />
+            <span>Create Invoice</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center"
+            onClick={() => router.push('/dashboard/owner/billing/customers')}
+          >
+            <Plus className="h-6 w-6 mb-2" />
+            <span>Record Payment</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center"
+            onClick={() => router.push('/dashboard/owner/billing/customers')}
+          >
+            <RefreshCw className="h-6 w-6 mb-2" />
+            <span>View All Customers</span>
+          </Button>
+          <Button
+            variant="outline"
+            className="h-auto py-4 flex flex-col items-center"
+            onClick={() => router.push('/dashboard/owner/billing/customers')}
+          >
+            <RefreshCw className="h-6 w-6 mb-2" />
+            <span>Manage Billing</span>
+          </Button>
         </div>
       </div>
     </div>

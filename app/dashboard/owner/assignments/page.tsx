@@ -2,14 +2,25 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { Job, JobAssignment, CompanyEmployee, Profile, JobWithCustomer, AssignmentStatus } from '@/types/database'
+import { JobWithCustomer, AssignmentStatus } from '@/types/database'
+import { assignmentsService, employeesService, jobsService, companiesService } from '@/lib/services'
 
-interface EmployeeWithProfile extends CompanyEmployee {
-  profile: Profile
+interface EmployeeWithProfile {
+  id: string
+  profile?: {
+    full_name: string
+  }
+  job_title?: string
 }
 
-interface JobAssignmentWithDetails extends JobAssignment {
+interface JobAssignmentWithDetails {
+  id: string
+  job_id: string
+  employee_id: string
+  assignment_status: AssignmentStatus
+  service_start_at?: string
+  service_end_at?: string
+  worker_confirmed_done_at?: string
   job?: JobWithCustomer
   employee?: EmployeeWithProfile
 }
@@ -34,67 +45,35 @@ export default function AssignmentsPage() {
 
     try {
       // Get owned companies
-      const { data: ownerData } = await supabase
-        .from('company_owners')
-        .select('company_id')
-        .eq('profile_id', profile.id)
+      const companiesResponse = await companiesService.getAll()
 
-      if (!ownerData || ownerData.length === 0) {
+      if (companiesResponse.error || !companiesResponse.data || companiesResponse.data.length === 0) {
         setLoadingData(false)
         return
       }
 
-      const companyIds = ownerData.map(o => o.company_id)
-      setCompanyId(companyIds[0])
+      setCompanyId(companiesResponse.data[0].id)
 
-      // Fetch all employees
-      const { data: employeesData } = await supabase
-        .from('company_employees')
-        .select(`
-          *,
-          profile:profiles(*)
-        `)
-        .in('company_id', companyIds)
-        .eq('employment_status', 'active')
-        .eq('approval_status', 'approved')
+      // Fetch all employees via API
+      const employeesResponse = await employeesService.getAll()
+      setEmployees((employeesResponse.data || []).filter((emp: any) =>
+        emp.employment_status === 'active' && emp.approval_status === 'approved'
+      ) as any)
 
-      setEmployees((employeesData as any) || [])
+      // Fetch all jobs via API
+      const jobsResponse = await jobsService.getAll()
+      const allJobs = (jobsResponse.data || []).filter(job => job.status !== 'cancelled')
 
-      // Fetch all jobs with customer info
-      const { data: jobsData } = await supabase
-        .from('jobs')
-        .select(`
-          *,
-          customer:customers(*)
-        `)
-        .in('company_id', companyIds)
-        .neq('status', 'cancelled')
-
-      // Fetch all assignments
-      const { data: assignmentsData } = await supabase
-        .from('job_assignments')
-        .select(`
-          *,
-          job:jobs(
-            *,
-            customer:customers(*)
-          ),
-          employee:company_employees(
-            *,
-            profile:profiles(*)
-          )
-        `)
-        .in('company_id', companyIds)
-        .neq('assignment_status', 'cancelled')
-
-      setAssignments((assignmentsData as any) || [])
+      // Fetch all assignments via API
+      const assignmentsResponse = await assignmentsService.getAll()
+      setAssignments((assignmentsResponse.data as any) || [])
 
       // Filter unassigned jobs (jobs with no assignments)
-      const assignedJobIds = new Set((assignmentsData || []).map((a: any) => a.job_id))
-      const unassigned = (jobsData || []).filter((job: any) =>
+      const assignedJobIds = new Set((assignmentsResponse.data || []).map((a: any) => a.job_id))
+      const unassigned = allJobs.filter((job: any) =>
         !assignedJobIds.has(job.id) && job.status !== 'done'
       )
-      setUnassignedJobs(unassigned as any)
+      setUnassignedJobs(unassigned)
 
     } catch (error) {
       console.error('Error fetching data:', error)
@@ -109,71 +88,14 @@ export default function AssignmentsPage() {
     }
   }, [profile])
 
-  // Set up realtime subscription to refresh when assignments change
-  useEffect(() => {
-    if (!companyId) return
-
-    const channel = supabase
-      .channel('assignment-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'job_assignments',
-          filter: `company_id=eq.${companyId}`
-        },
-        (payload) => {
-          console.log('Assignment changed, refreshing data:', payload)
-          fetchData()
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'jobs',
-          filter: `company_id=eq.${companyId}`
-        },
-        (payload) => {
-          console.log('Job changed, refreshing data:', payload)
-          fetchData()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [companyId])
-
   const handleChangeAssignmentStatus = async (assignmentId: string, newStatus: AssignmentStatus) => {
     try {
-      const { data, error } = await supabase
-        .from('job_assignments')
-        .update({
-          assignment_status: newStatus,
-          ...(newStatus === 'done' ? { worker_confirmed_done_at: new Date().toISOString() } : {})
-        })
-        .eq('id', assignmentId)
-        .select(`
-          *,
-          job:jobs(
-            *,
-            customer:customers(*)
-          ),
-          employee:company_employees(
-            *,
-            profile:profiles(*)
-          )
-        `)
-        .single()
+      const response = await assignmentsService.changeStatus(assignmentId, newStatus)
 
-      if (error) throw error
+      if (response.error) throw new Error(response.error)
 
       // Update local state
-      setAssignments(prev => prev.map(a => a.id === assignmentId ? data as any : a))
+      setAssignments(prev => prev.map(a => a.id === assignmentId ? response.data as any : a))
 
       // Refresh data to sync everything (job status is auto-updated by database trigger)
       fetchData()
@@ -206,26 +128,12 @@ export default function AssignmentsPage() {
         assignmentData.service_end_at = new Date(serviceEndDate).toISOString()
       }
 
-      const { data, error } = await supabase
-        .from('job_assignments')
-        .insert([assignmentData])
-        .select(`
-          *,
-          job:jobs(
-            *,
-            customer:customers(*)
-          ),
-          employee:company_employees(
-            *,
-            profile:profiles(*)
-          )
-        `)
-        .single()
+      const response = await assignmentsService.create(assignmentData)
 
-      if (error) throw error
+      if (response.error) throw new Error(response.error)
 
       // Add to assignments list
-      setAssignments(prev => [...prev, data as any])
+      setAssignments(prev => [...prev, response.data as any])
 
       // Remove from unassigned
       setUnassignedJobs(prev => prev.filter(job => job.id !== jobId))
@@ -243,18 +151,15 @@ export default function AssignmentsPage() {
     }
   }
 
-  const handleRemoveAssignment = async (assignmentId: string, jobId: string) => {
+  const handleRemoveAssignment = async (assignmentId: string) => {
     if (!confirm('Are you sure you want to remove this assignment?')) {
       return
     }
 
     try {
-      const { error } = await supabase
-        .from('job_assignments')
-        .delete()
-        .eq('id', assignmentId)
+      const response = await assignmentsService.delete(assignmentId)
 
-      if (error) throw error
+      if (response.error) throw new Error(response.error)
 
       fetchData() // Refresh to update unassigned jobs
 
@@ -326,7 +231,7 @@ export default function AssignmentsPage() {
           )}
         </div>
         <button
-          onClick={() => handleRemoveAssignment(assignment.id, assignment.job_id)}
+          onClick={() => handleRemoveAssignment(assignment.id)}
           className="ml-2 text-red-400 hover:text-red-300"
           title="Remove assignment"
         >
@@ -398,7 +303,7 @@ export default function AssignmentsPage() {
                           <option value="">Select Employee</option>
                           {employees.map((emp) => (
                             <option key={emp.id} value={emp.id}>
-                              {emp.profile.full_name}
+                              {emp.profile?.full_name || 'Unknown'}
                             </option>
                           ))}
                         </select>

@@ -2,21 +2,31 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
 import { Customer } from '@/types/database'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { useRouter } from 'next/navigation'
+import { customersService, companiesService } from '@/lib/services'
+import { getCustomersWithBilling, CustomerWithBilling } from '@/app/actions/customers'
+import { CustomersTable } from '@/components/customers/CustomersTable'
+import { AddPaymentDrawer } from '@/components/customers/AddPaymentDrawer'
+import { ApplyPaymentDrawer } from '@/components/billing/ApplyPaymentDrawer'
+import { CustomersTableSkeleton } from '@/components/customers/CustomersTableSkeleton'
 
 export default function CustomersPage() {
   const { profile } = useAuth()
   const router = useRouter()
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [customersWithBilling, setCustomersWithBilling] = useState<CustomerWithBilling[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
-  const [sortColumn, setSortColumn] = useState<'name' | 'billing_city' | 'service_city' | null>(null)
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
+  const [depositDrawerOpen, setDepositDrawerOpen] = useState(false)
+  const [paymentDrawerOpen, setPaymentDrawerOpen] = useState(false)
+  const [selectedCustomerForPayment, setSelectedCustomerForPayment] = useState<{
+    id: string
+    name: string
+  } | null>(null)
 
   // Form state
   const [formData, setFormData] = useState({
@@ -41,45 +51,49 @@ export default function CustomersPage() {
 
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
-    const fetchCustomers = async () => {
-      if (!profile?.id) {
+  const fetchCustomersData = async () => {
+    if (!profile?.id) {
+      setLoadingData(false)
+      return
+    }
+
+    try {
+      setLoadingData(true)
+
+      // Get owned companies
+      const companiesResponse = await companiesService.getAll()
+
+      if (companiesResponse.error || !companiesResponse.data || companiesResponse.data.length === 0) {
         setLoadingData(false)
         return
       }
 
-      try {
-        // Get owned companies
-        const { data: ownerData } = await supabase
-          .from('company_owners')
-          .select('company_id')
-          .eq('profile_id', profile.id)
+      setCompanyId(companiesResponse.data[0].id) // Use first company for now
 
-        if (!ownerData || ownerData.length === 0) {
-          setLoadingData(false)
-          return
-        }
+      // Fetch customers via API
+      const response = await customersService.getAll()
 
-        const companyIds = ownerData.map(o => o.company_id)
-        setCompanyId(companyIds[0]) // Use first company for now
-
-        // Fetch customers for all owned companies
-        const { data: customersData } = await supabase
-          .from('customers')
-          .select('*')
-          .in('company_id', companyIds)
-          .order('created_at', { ascending: false })
-
-        setCustomers((customersData as Customer[]) || [])
-      } catch (error) {
-        console.error('Error fetching customers:', error)
+      if (response.error) {
+        console.error('Error fetching customers:', response.error)
+        setLoadingData(false)
+        return
       }
 
-      setLoadingData(false)
+      setCustomers(response.data || [])
+
+      // Fetch customers with billing data
+      const billingData = await getCustomersWithBilling()
+      setCustomersWithBilling(billingData)
+    } catch (error) {
+      console.error('Error fetching customers:', error)
     }
 
+    setLoadingData(false)
+  }
+
+  useEffect(() => {
     if (profile) {
-      fetchCustomers()
+      fetchCustomersData()
     }
   }, [profile])
 
@@ -144,34 +158,29 @@ export default function CustomersPage() {
 
     try {
       if (editingCustomer) {
-        // Update existing customer
-        const { data, error } = await supabase
-          .from('customers')
-          .update(formData)
-          .eq('id', editingCustomer.id)
-          .select()
-          .single()
+        // Update existing customer via API
+        const response = await customersService.update(editingCustomer.id, formData)
 
-        if (error) throw error
+        if (response.error) throw new Error(response.error)
 
-        setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? data as Customer : c))
+        setCustomers(prev => prev.map(c => c.id === editingCustomer.id ? response.data! : c))
+
+        // Refresh billing data to update the table
+        await fetchCustomersData()
+
         alert('Customer updated successfully!')
       } else {
-        // Create new customer
+        // Create new customer via API
         const customerData = {
           company_id: companyId,
           ...formData
         }
 
-        const { data, error } = await supabase
-          .from('customers')
-          .insert([customerData])
-          .select()
-          .single()
+        const response = await customersService.create(customerData as any)
 
-        if (error) throw error
+        if (response.error) throw new Error(response.error)
 
-        setCustomers(prev => [data as Customer, ...prev])
+        setCustomers(prev => [response.data!, ...prev])
         alert('Customer created successfully!')
       }
 
@@ -206,26 +215,30 @@ export default function CustomersPage() {
     setSubmitting(false)
   }
 
-  const handleEditCustomer = (customer: Customer) => {
-    setEditingCustomer(customer)
+  const handleEditCustomer = (customerWithBilling: CustomerWithBilling | Customer) => {
+    // Find the full customer data from the customers array
+    const fullCustomer = customers.find(c => c.id === customerWithBilling.id)
+    if (!fullCustomer) return
+
+    setEditingCustomer(fullCustomer)
     setFormData({
-      name: customer.name,
-      phone: customer.phone || '',
-      email: customer.email || '',
-      billing_address: customer.billing_address || '',
-      billing_address_line_2: customer.billing_address_line_2 || '',
-      billing_city: customer.billing_city || '',
-      billing_state: customer.billing_state || '',
-      billing_zipcode: customer.billing_zipcode || '',
-      billing_country: customer.billing_country || 'USA',
-      service_address: customer.service_address || '',
-      service_address_line_2: customer.service_address_line_2 || '',
-      service_city: customer.service_city || '',
-      service_state: customer.service_state || '',
-      service_zipcode: customer.service_zipcode || '',
-      service_country: customer.service_country || 'USA',
-      same_as_billing: customer.same_as_billing,
-      notes: customer.notes || ''
+      name: fullCustomer.name,
+      phone: fullCustomer.phone || '',
+      email: fullCustomer.email || '',
+      billing_address: fullCustomer.billing_address || '',
+      billing_address_line_2: fullCustomer.billing_address_line_2 || '',
+      billing_city: fullCustomer.billing_city || '',
+      billing_state: fullCustomer.billing_state || '',
+      billing_zipcode: fullCustomer.billing_zipcode || '',
+      billing_country: fullCustomer.billing_country || 'USA',
+      service_address: fullCustomer.service_address || '',
+      service_address_line_2: fullCustomer.service_address_line_2 || '',
+      service_city: fullCustomer.service_city || '',
+      service_state: fullCustomer.service_state || '',
+      service_zipcode: fullCustomer.service_zipcode || '',
+      service_country: fullCustomer.service_country || 'USA',
+      same_as_billing: fullCustomer.same_as_billing,
+      notes: fullCustomer.notes || ''
     })
     setShowForm(true)
     // Scroll to form
@@ -256,74 +269,19 @@ export default function CustomersPage() {
     })
   }
 
-  const formatPhoneNumber = (phone: string | null) => {
-    if (!phone) return 'N/A'
-    const cleaned = phone.replace(/\D/g, '')
-    if (cleaned.length === 10) {
-      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
-    }
-    return phone
+  const handleAddDeposit = (customerId: string, customerName: string) => {
+    setSelectedCustomerForPayment({ id: customerId, name: customerName })
+    setDepositDrawerOpen(true)
   }
 
-  const handleSort = (column: 'name' | 'billing_city' | 'service_city') => {
-    const newDirection = sortColumn === column && sortDirection === 'asc' ? 'desc' : 'asc'
-    setSortColumn(column)
-    setSortDirection(newDirection)
-
-    const sorted = [...customers].sort((a, b) => {
-      let aValue = ''
-      let bValue = ''
-
-      if (column === 'name') {
-        aValue = a.name?.toLowerCase() || ''
-        bValue = b.name?.toLowerCase() || ''
-      } else if (column === 'billing_city') {
-        aValue = a.billing_city?.toLowerCase() || ''
-        bValue = b.billing_city?.toLowerCase() || ''
-      } else if (column === 'service_city') {
-        // Use service city if different from billing, otherwise use billing city
-        aValue = (a.same_as_billing ? a.billing_city : a.service_city)?.toLowerCase() || ''
-        bValue = (b.same_as_billing ? b.billing_city : b.service_city)?.toLowerCase() || ''
-      }
-
-      if (newDirection === 'asc') {
-        return aValue.localeCompare(bValue)
-      } else {
-        return bValue.localeCompare(aValue)
-      }
-    })
-
-    setCustomers(sorted)
+  const handleAddPayment = (customerId: string, customerName: string) => {
+    setSelectedCustomerForPayment({ id: customerId, name: customerName })
+    setPaymentDrawerOpen(true)
   }
 
-  const SortIcon = ({ column }: { column: 'name' | 'billing_city' | 'service_city' }) => {
-    if (sortColumn !== column) {
-      return (
-        <svg className="w-4 h-4 ml-1 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-        </svg>
-      )
-    }
-
-    if (sortDirection === 'asc') {
-      return (
-        <svg className="w-4 h-4 ml-1 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-        </svg>
-      )
-    }
-
-    return (
-      <svg className="w-4 h-4 ml-1 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-      </svg>
-    )
-  }
-
-  const handleCreateJob = (customer: Customer) => {
-    // Store customer data in sessionStorage to pre-fill job form
-    sessionStorage.setItem('createJobForCustomer', JSON.stringify(customer))
-    router.push('/dashboard/owner/jobs?create=true')
+  const handlePaymentSuccess = () => {
+    // Refresh customer billing data
+    fetchCustomersData()
   }
 
   if (loadingData) {
@@ -587,141 +545,40 @@ export default function CustomersPage() {
           </form>
         )}
 
-        {/* Customer List */}
-        {customers.length === 0 ? (
-          <div className="text-center py-8">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-600"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-              />
-            </svg>
-            <p className="mt-2 text-sm text-gray-400">No customers yet</p>
-            <p className="mt-1 text-xs text-gray-500">
-              Click "Add Customer" to create your first customer
-            </p>
-          </div>
+        {/* Customer List with Billing */}
+        {loadingData ? (
+          <CustomersTableSkeleton />
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-700">
-              <thead className="bg-gray-900">
-                <tr>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-800 transition-colors"
-                    onClick={() => handleSort('name')}
-                  >
-                    <div className="flex items-center">
-                      Name
-                      <SortIcon column="name" />
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Phone
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-800 transition-colors"
-                    onClick={() => handleSort('billing_city')}
-                  >
-                    <div className="flex items-center">
-                      Billing Address
-                      <SortIcon column="billing_city" />
-                    </div>
-                  </th>
-                  <th
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-800 transition-colors"
-                    onClick={() => handleSort('service_city')}
-                  >
-                    <div className="flex items-center">
-                      Service Address
-                      <SortIcon column="service_city" />
-                    </div>
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-gray-800 divide-y divide-gray-700">
-                {customers.map((customer) => (
-                  <tr key={customer.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                      {customer.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {customer.phone ? formatPhoneNumber(customer.phone) : <span className="text-gray-500 italic">Empty</span>}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
-                      {customer.email || <span className="text-gray-500 italic">Empty</span>}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-300">
-                      {customer.billing_address ? (
-                        <div>
-                          <div>{customer.billing_address}</div>
-                          {customer.billing_address_line_2 && (
-                            <div>{customer.billing_address_line_2}</div>
-                          )}
-                          {customer.billing_city && customer.billing_state && (
-                            <div className="text-xs text-gray-400">
-                              {customer.billing_city}, {customer.billing_state} {customer.billing_zipcode}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-500">N/A</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-300">
-                      {customer.same_as_billing ? (
-                        <span className="text-gray-500 italic">Same as billing</span>
-                      ) : customer.service_address ? (
-                        <div>
-                          <div>{customer.service_address}</div>
-                          {customer.service_address_line_2 && (
-                            <div>{customer.service_address_line_2}</div>
-                          )}
-                          {customer.service_city && customer.service_state && (
-                            <div className="text-xs text-gray-400">
-                              {customer.service_city}, {customer.service_state} {customer.service_zipcode}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-gray-500">N/A</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleEditCustomer(customer)}
-                          className="px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleCreateJob(customer)}
-                          className="px-3 py-1.5 bg-green-600 text-white rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 text-xs font-medium"
-                        >
-                          Create Job
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <CustomersTable
+            customers={customersWithBilling}
+            onAddDeposit={handleAddDeposit}
+            onAddPayment={handleAddPayment}
+            onEditCustomer={handleEditCustomer}
+          />
         )}
       </div>
+
+      {/* Add Deposit Drawer */}
+      {selectedCustomerForPayment && (
+        <AddPaymentDrawer
+          open={depositDrawerOpen}
+          onOpenChange={setDepositDrawerOpen}
+          customerId={selectedCustomerForPayment.id}
+          customerName={selectedCustomerForPayment.name}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      {/* Add Payment Drawer */}
+      {selectedCustomerForPayment && (
+        <ApplyPaymentDrawer
+          open={paymentDrawerOpen}
+          onOpenChange={setPaymentDrawerOpen}
+          customerId={selectedCustomerForPayment.id}
+          customerName={selectedCustomerForPayment.name}
+          onSuccess={handlePaymentSuccess}
+        />
+      )}
     </div>
   )
 }

@@ -1,0 +1,289 @@
+'use client'
+
+import { CustomerWithBilling } from '@/app/actions/customers'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { MoreHorizontal, Eye, CreditCard, FileText, Plus, Edit, Briefcase } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+
+interface CustomersTableProps {
+  customers: CustomerWithBilling[]
+  onAddDeposit: (customerId: string, customerName: string) => void
+  onAddPayment: (customerId: string, customerName: string) => void
+  onEditCustomer: (customer: CustomerWithBilling) => void
+}
+
+export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCustomer }: CustomersTableProps) {
+  const router = useRouter()
+  const [sortColumn, setSortColumn] = useState<keyof CustomerWithBilling | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  const handleSort = (column: keyof CustomerWithBilling) => {
+    const newDirection =
+      sortColumn === column && sortDirection === 'asc' ? 'desc' : 'asc'
+    setSortColumn(column)
+    setSortDirection(newDirection)
+  }
+
+  const sortedCustomers = [...customers].sort((a, b) => {
+    if (!sortColumn) return 0
+
+    const aValue = a[sortColumn]
+    const bValue = b[sortColumn]
+
+    if (aValue === null || aValue === undefined) return 1
+    if (bValue === null || bValue === undefined) return -1
+
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      return sortDirection === 'asc'
+        ? aValue.localeCompare(bValue)
+        : bValue.localeCompare(aValue)
+    }
+
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
+    }
+
+    return 0
+  })
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(amount)
+  }
+
+  const formatPhoneNumber = (phone: string | null) => {
+    if (!phone) return '-'
+    const cleaned = phone.replace(/\D/g, '')
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    }
+    return phone
+  }
+
+  if (customers.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        <div className="rounded-full bg-gray-100 p-3 dark:bg-gray-800">
+          <CreditCard className="h-6 w-6 text-gray-400" />
+        </div>
+        <h3 className="mt-4 text-lg font-semibold">No customers yet</h3>
+        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+          Get started by creating your first customer
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="rounded-md border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead
+              className="cursor-pointer select-none"
+              onClick={() => handleSort('name')}
+              role="button"
+              aria-sort={
+                sortColumn === 'name'
+                  ? sortDirection === 'asc'
+                    ? 'ascending'
+                    : 'descending'
+                  : 'none'
+              }
+            >
+              <div className="flex items-center">
+                Name
+                {sortColumn === 'name' && (
+                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                )}
+              </div>
+            </TableHead>
+            <TableHead>Contact</TableHead>
+            <TableHead>Location</TableHead>
+            <TableHead
+              className="cursor-pointer select-none text-right"
+              onClick={() => handleSort('billedBalance')}
+              role="button"
+              aria-sort={
+                sortColumn === 'billedBalance'
+                  ? sortDirection === 'asc'
+                    ? 'ascending'
+                    : 'descending'
+                  : 'none'
+              }
+            >
+              <div className="flex items-center justify-end">
+                Billed Balance
+                {sortColumn === 'billedBalance' && (
+                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                )}
+              </div>
+            </TableHead>
+            <TableHead
+              className="cursor-pointer select-none text-right"
+              onClick={() => handleSort('unappliedCredit')}
+              role="button"
+              aria-sort={
+                sortColumn === 'unappliedCredit'
+                  ? sortDirection === 'asc'
+                    ? 'ascending'
+                    : 'descending'
+                  : 'none'
+              }
+            >
+              <div className="flex items-center justify-end">
+                Unapplied Credit
+                {sortColumn === 'unappliedCredit' && (
+                  <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                )}
+              </div>
+            </TableHead>
+            <TableHead className="text-center">Open Invoices</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sortedCustomers.map((customer) => (
+            <TableRow key={customer.id} className="group">
+              <TableCell className="font-medium">{customer.name}</TableCell>
+              <TableCell>
+                <div className="flex flex-col text-sm">
+                  <span className="text-gray-900 dark:text-gray-100">
+                    {customer.email || '-'}
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {formatPhoneNumber(customer.phone)}
+                  </span>
+                </div>
+              </TableCell>
+              <TableCell>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {customer.billing_city && customer.billing_state
+                    ? `${customer.billing_city}, ${customer.billing_state}`
+                    : '-'}
+                </div>
+              </TableCell>
+              <TableCell className="text-right">
+                <div
+                  className="inline-flex items-center"
+                  title={`Total invoiced minus payments: ${formatCurrency(
+                    customer.billedBalance
+                  )}`}
+                >
+                  <Badge
+                    variant={
+                      customer.billedBalance > 0
+                        ? 'destructive'
+                        : customer.billedBalance < 0
+                        ? 'default'
+                        : 'secondary'
+                    }
+                    className="font-mono"
+                  >
+                    {formatCurrency(customer.billedBalance)}
+                  </Badge>
+                </div>
+              </TableCell>
+              <TableCell className="text-right">
+                <div
+                  className="inline-flex items-center"
+                  title="Credit available to apply to invoices"
+                >
+                  {customer.unappliedCredit > 0 ? (
+                    <Badge variant="default" className="font-mono">
+                      {formatCurrency(customer.unappliedCredit)}
+                    </Badge>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </div>
+              </TableCell>
+              <TableCell className="text-center">
+                {customer.openInvoices > 0 ? (
+                  <Badge variant="outline">{customer.openInvoices}</Badge>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
+              </TableCell>
+              <TableCell className="text-right">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                      aria-label={`Actions for ${customer.name}`}
+                    >
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => router.push(`/dashboard/owner/customers/${customer.id}`)}
+                    >
+                      <Eye className="mr-2 h-4 w-4" />
+                      View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onEditCustomer(customer)}
+                    >
+                      <Edit className="mr-2 h-4 w-4" />
+                      Edit Customer
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => {
+                        sessionStorage.setItem('createJobForCustomer', JSON.stringify(customer))
+                        router.push('/dashboard/owner/jobs?create=true')
+                      }}
+                    >
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      Create Job
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        router.push(`/dashboard/owner/billing/customers/${customer.id}`)
+                      }
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Billing
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onAddDeposit(customer.id, customer.name)}
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Add Deposit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => onAddPayment(customer.id, customer.name)}
+                    >
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Add Payment
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}

@@ -120,7 +120,6 @@ export default function DebugAuthPage() {
 
             <button
               onClick={async () => {
-                const { signOut } = await import('@/contexts/AuthContext')
                 // Use supabase directly to sign out
                 await supabase.auth.signOut()
                 window.location.href = '/login'
