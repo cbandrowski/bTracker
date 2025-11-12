@@ -34,8 +34,6 @@ export default function AssignmentsPage() {
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [assigningJobId, setAssigningJobId] = useState<string | null>(null)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
-  const [serviceStartDate, setServiceStartDate] = useState('')
-  const [serviceEndDate, setServiceEndDate] = useState('')
 
   const fetchData = async () => {
     if (!profile?.id) {
@@ -121,12 +119,11 @@ export default function AssignmentsPage() {
         assignment_status: 'assigned'
       }
 
-      if (serviceStartDate) {
-        assignmentData.service_start_at = new Date(serviceStartDate).toISOString()
-      }
-      if (serviceEndDate) {
-        assignmentData.service_end_at = new Date(serviceEndDate).toISOString()
-      }
+      const job = unassignedJobs.find(j => j.id === jobId)
+      const jobStart = job && ((job as any).service_start_at || (job as any).scheduled_start_at || (job as any).start_at || (job as any).scheduled_at || null)
+      const jobEnd = job && ((job as any).service_end_at || (job as any).scheduled_end_at || (job as any).end_at || null)
+      if (jobStart) assignmentData.service_start_at = new Date(jobStart as any).toISOString()
+      if (jobEnd) assignmentData.service_end_at = new Date(jobEnd as any).toISOString()
 
       const response = await assignmentsService.create(assignmentData)
 
@@ -141,8 +138,6 @@ export default function AssignmentsPage() {
       // Reset form
       setAssigningJobId(null)
       setSelectedEmployeeId('')
-      setServiceStartDate('')
-      setServiceEndDate('')
 
       alert('Employee assigned successfully!')
     } catch (error) {
@@ -308,19 +303,6 @@ export default function AssignmentsPage() {
                           ))}
                         </select>
 
-                        <input
-                          type="datetime-local"
-                          value={serviceStartDate}
-                          onChange={(e) => setServiceStartDate(e.target.value)}
-                          className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs"
-                        />
-
-                        <input
-                          type="datetime-local"
-                          value={serviceEndDate}
-                          onChange={(e) => setServiceEndDate(e.target.value)}
-                          className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs"
-                        />
 
                         <div className="flex space-x-2">
                           <button
@@ -334,8 +316,6 @@ export default function AssignmentsPage() {
                             onClick={() => {
                               setAssigningJobId(null)
                               setSelectedEmployeeId('')
-                              setServiceStartDate('')
-                              setServiceEndDate('')
                             }}
                             className="flex-1 px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-500"
                           >

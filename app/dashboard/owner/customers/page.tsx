@@ -11,6 +11,7 @@ import { CustomersTable } from '@/components/customers/CustomersTable'
 import { AddPaymentDrawer } from '@/components/customers/AddPaymentDrawer'
 import { ApplyPaymentDrawer } from '@/components/billing/ApplyPaymentDrawer'
 import { CustomersTableSkeleton } from '@/components/customers/CustomersTableSkeleton'
+import { CreateRecurringJobDrawer } from '@/components/jobs/CreateRecurringJobDrawer'
 
 export default function CustomersPage() {
   const { profile } = useAuth()
@@ -23,6 +24,7 @@ export default function CustomersPage() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [depositDrawerOpen, setDepositDrawerOpen] = useState(false)
   const [paymentDrawerOpen, setPaymentDrawerOpen] = useState(false)
+  const [recurringJobDrawerOpen, setRecurringJobDrawerOpen] = useState(false)
   const [selectedCustomerForPayment, setSelectedCustomerForPayment] = useState<{
     id: string
     name: string
@@ -279,8 +281,18 @@ export default function CustomersPage() {
     setPaymentDrawerOpen(true)
   }
 
+  const handleCreateRecurringJob = (customerId: string, customerName: string) => {
+    setSelectedCustomerForPayment({ id: customerId, name: customerName })
+    setRecurringJobDrawerOpen(true)
+  }
+
   const handlePaymentSuccess = () => {
     // Refresh customer billing data
+    fetchCustomersData()
+  }
+
+  const handleRecurringJobSuccess = () => {
+    // Jobs created, could refresh if needed
     fetchCustomersData()
   }
 
@@ -554,6 +566,7 @@ export default function CustomersPage() {
             onAddDeposit={handleAddDeposit}
             onAddPayment={handleAddPayment}
             onEditCustomer={handleEditCustomer}
+            onCreateRecurringJob={handleCreateRecurringJob}
           />
         )}
       </div>
@@ -577,6 +590,17 @@ export default function CustomersPage() {
           customerId={selectedCustomerForPayment.id}
           customerName={selectedCustomerForPayment.name}
           onSuccess={handlePaymentSuccess}
+        />
+      )}
+
+      {/* Create Recurring Job Drawer */}
+      {selectedCustomerForPayment && (
+        <CreateRecurringJobDrawer
+          open={recurringJobDrawerOpen}
+          onOpenChange={setRecurringJobDrawerOpen}
+          customerId={selectedCustomerForPayment.id}
+          customerName={selectedCustomerForPayment.name}
+          onSuccess={handleRecurringJobSuccess}
         />
       )}
     </div>

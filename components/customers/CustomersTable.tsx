@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { MoreHorizontal, Eye, CreditCard, FileText, Plus, Edit, Briefcase } from 'lucide-react'
+import { MoreHorizontal, Eye, CreditCard, FileText, Plus, Edit, Briefcase, Repeat } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -26,9 +26,10 @@ interface CustomersTableProps {
   onAddDeposit: (customerId: string, customerName: string) => void
   onAddPayment: (customerId: string, customerName: string) => void
   onEditCustomer: (customer: CustomerWithBilling) => void
+  onCreateRecurringJob?: (customerId: string, customerName: string) => void
 }
 
-export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCustomer }: CustomersTableProps) {
+export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCustomer, onCreateRecurringJob }: CustomersTableProps) {
   const router = useRouter()
   const [sortColumn, setSortColumn] = useState<keyof CustomerWithBilling | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -257,6 +258,14 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
                       <Briefcase className="mr-2 h-4 w-4" />
                       Create Job
                     </DropdownMenuItem>
+                    {onCreateRecurringJob && (
+                      <DropdownMenuItem
+                        onClick={() => onCreateRecurringJob(customer.id, customer.name)}
+                      >
+                        <Repeat className="mr-2 h-4 w-4" />
+                        Create Recurring Jobs
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem
                       onClick={() =>
                         router.push(`/dashboard/owner/billing/customers/${customer.id}`)

@@ -51,6 +51,7 @@ interface InvoiceLineInput {
   quantity: number
   unitPrice: number
   taxRate: number
+  jobId?: string | null
 }
 
 interface CompanyInfo {
