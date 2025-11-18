@@ -16,20 +16,18 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    // Fetch recent invoices with customer names
+    // Fetch recent invoices with customer names using v_invoice_summary for accurate status
     const { data: invoices, error } = await supabase
-      .from('invoices')
+      .from('v_invoice_summary')
       .select(`
-        id,
+        invoice_id,
         invoice_number,
         customer_id,
-        status,
+        computed_status,
         due_date,
         total_amount,
-        created_at,
-        customers (
-          name
-        )
+        total_paid,
+        created_at
       `)
       .in('company_id', companyIds)
       .order('created_at', { ascending: false })
@@ -40,15 +38,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch invoices' }, { status: 500 })
     }
 
+    // Get customer names for the invoices
+    const customerIds = [...new Set(invoices?.map(inv => inv.customer_id) || [])]
+    const { data: customers } = await supabase
+      .from('customers')
+      .select('id, name')
+      .in('id', customerIds)
+
+    const customerMap = new Map(customers?.map(c => [c.id, c.name]) || [])
+
     // Format response
     const formattedInvoices = invoices?.map(invoice => ({
-      id: invoice.id,
+      id: invoice.invoice_id,
       invoice_number: invoice.invoice_number,
       customer_id: invoice.customer_id,
-      customer_name: (invoice.customers as any)?.name || 'Unknown',
-      status: invoice.status,
+      customer_name: customerMap.get(invoice.customer_id) || 'Unknown',
+      status: invoice.computed_status,
       due_date: invoice.due_date,
       total: Number(invoice.total_amount) || 0,
+      paid_amount: Number(invoice.total_paid) || 0,
       created_at: invoice.created_at,
     })) || []
 

@@ -19,8 +19,11 @@ interface AssignmentWithDetails extends JobAssignment {
   }
 }
 
-type ViewMode = 'week' | 'month'
+type ViewMode = 'day' | 'week' | 'month'
 type StatusFilter = 'all' | 'upcoming' | 'in_progress' | 'completed'
+const HOURS_IN_DAY = 24
+const HOUR_BLOCK_HEIGHT = 64
+const MIN_MINUTES_PER_BLOCK = 30
 
 export default function SchedulePage() {
   const { profile } = useAuth()
@@ -146,7 +149,10 @@ export default function SchedulePage() {
       return new Date(date.getFullYear(), date.getMonth() + 1, 0)
     }
 
-    if (viewMode === 'week') {
+    if (viewMode === 'day') {
+      // Day view - just return single day
+      return [new Date(currentDate)]
+    } else if (viewMode === 'week') {
       const start = startOfWeek(currentDate)
       const days = []
       for (let i = 0; i < 7; i++) {
@@ -201,7 +207,9 @@ export default function SchedulePage() {
   // Navigation functions
   const goToPrevious = () => {
     const newDate = new Date(currentDate)
-    if (viewMode === 'week') {
+    if (viewMode === 'day') {
+      newDate.setDate(currentDate.getDate() - 1)
+    } else if (viewMode === 'week') {
       newDate.setDate(currentDate.getDate() - 7)
     } else {
       newDate.setMonth(currentDate.getMonth() - 1)
@@ -211,7 +219,9 @@ export default function SchedulePage() {
 
   const goToNext = () => {
     const newDate = new Date(currentDate)
-    if (viewMode === 'week') {
+    if (viewMode === 'day') {
+      newDate.setDate(currentDate.getDate() + 1)
+    } else if (viewMode === 'week') {
       newDate.setDate(currentDate.getDate() + 7)
     } else {
       newDate.setMonth(currentDate.getMonth() + 1)
@@ -226,6 +236,14 @@ export default function SchedulePage() {
   const formatTime = (dateString: string) => {
     const date = new Date(dateString)
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+
+  const formatTimeRange = (startString: string | null, endString: string | null) => {
+    if (!startString) return 'No time set'
+    const start = formatTime(startString)
+    if (!endString) return start
+    const end = formatTime(endString)
+    return `${start} - ${end}`
   }
 
   const getStatusColor = (status: AssignmentStatus) => {
@@ -243,6 +261,21 @@ export default function SchedulePage() {
     }
   }
 
+  const getStatusBadge = (status: AssignmentStatus) => {
+    switch (status) {
+      case 'assigned':
+        return 'Scheduled'
+      case 'in_progress':
+        return 'In Progress'
+      case 'done':
+        return 'Completed'
+      case 'cancelled':
+        return 'Cancelled'
+      default:
+        return status
+    }
+  }
+
   const isToday = (date: Date) => {
     const today = new Date()
     return date.toDateString() === today.toDateString()
@@ -250,6 +283,29 @@ export default function SchedulePage() {
 
   const isCurrentMonth = (date: Date) => {
     return date.getMonth() === currentDate.getMonth()
+  }
+
+  const getHourLabel = (hour: number) => {
+    const date = new Date()
+    date.setHours(hour, 0, 0, 0)
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true })
+  }
+
+  const minutesSinceStartOfDay = (dateString: string) => {
+    const date = new Date(dateString)
+    return date.getHours() * 60 + date.getMinutes()
+  }
+
+  const minuteHeight = HOUR_BLOCK_HEIGHT / 60
+  const timelineHeight = HOURS_IN_DAY * HOUR_BLOCK_HEIGHT
+  const dayAssignments = getAssignmentsForDay(currentDate)
+
+  const handleDaySelection = (day: Date) => {
+    const selectedDay = new Date(day)
+    setCurrentDate(selectedDay)
+    if (viewMode !== 'day') {
+      setViewMode('day')
+    }
   }
 
   if (loading) {
@@ -296,8 +352,18 @@ export default function SchedulePage() {
             {/* View Mode Toggle */}
             <div className="flex bg-gray-700 rounded-md border border-gray-600">
               <button
-                onClick={() => setViewMode('week')}
+                onClick={() => setViewMode('day')}
                 className={`px-4 py-2 rounded-l-md ${
+                  viewMode === 'day'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                Day
+              </button>
+              <button
+                onClick={() => setViewMode('week')}
+                className={`px-4 py-2 ${
                   viewMode === 'week'
                     ? 'bg-blue-600 text-white'
                     : 'text-gray-300 hover:bg-gray-600'
@@ -335,7 +401,8 @@ export default function SchedulePage() {
               {currentDate.toLocaleDateString('en-US', {
                 month: 'long',
                 year: 'numeric',
-                ...(viewMode === 'week' ? { day: 'numeric' } : {})
+                ...(viewMode === 'month' ? {} : { day: 'numeric' }),
+                ...(viewMode === 'day' ? { weekday: 'long' } : {})
               })}
             </h3>
             <button
@@ -355,85 +422,175 @@ export default function SchedulePage() {
         </div>
       </div>
 
-      {/* Calendar Grid */}
-      <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
-        {/* Day headers */}
-        <div className={`grid ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-7'} gap-2 mb-4`}>
-          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-            <div key={day} className="text-center font-semibold text-gray-400 py-2">
-              {day}
-            </div>
-          ))}
-        </div>
-
-        {/* Calendar days */}
-        <div className={`grid ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-7'} gap-2`}>
-          {calendarData.map((day, index) => {
-            const dayAssignments = getAssignmentsForDay(day)
-            const isTodayDate = isToday(day)
-            const isCurrentMonthDate = isCurrentMonth(day)
-
-            return (
-              <div
-                key={index}
-                className={`min-h-32 p-2 rounded-lg border ${
-                  isTodayDate
-                    ? 'bg-blue-900/20 border-blue-500'
-                    : 'bg-gray-900 border-gray-700'
-                } ${
-                  viewMode === 'month' && !isCurrentMonthDate
-                    ? 'opacity-40'
-                    : ''
-                }`}
-              >
-                <div className={`text-sm font-semibold mb-2 ${
-                  isTodayDate ? 'text-blue-400' : 'text-gray-400'
-                }`}>
-                  {day.getDate()}
+      {viewMode === 'day' ? (
+        <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-white">Daily Schedule</h3>
+            <span className="text-sm text-gray-400">
+              {currentDate.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })}
+            </span>
+          </div>
+          <div className="mt-6 grid grid-cols-[70px_1fr] gap-4">
+            <div className="text-right text-xs text-gray-500">
+              {Array.from({ length: HOURS_IN_DAY }).map((_, hour) => (
+                <div key={hour} className="h-16 relative">
+                  <span className="absolute top-1/2 right-2 -translate-y-1/2">
+                    {getHourLabel(hour)}
+                  </span>
                 </div>
+              ))}
+            </div>
+            <div
+              className="relative border-l border-gray-700 rounded-lg bg-gray-900/30 overflow-hidden"
+              style={{ height: `${timelineHeight}px` }}
+              onClick={() => setSelectedAssignment(null)}
+            >
+              <div className="absolute inset-0 pointer-events-none">
+                {Array.from({ length: HOURS_IN_DAY }).map((_, hour) => (
+                  <div key={hour} className="h-16 border-b border-gray-800/70"></div>
+                ))}
+              </div>
+              <div className="relative h-full">
+                {dayAssignments.length === 0 && (
+                  <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
+                    No assignments scheduled
+                  </div>
+                )}
+                {dayAssignments.map(assignment => {
+                  if (!assignment.service_start_at) return null
+                  const startMinutes = Math.max(0, Math.min(minutesSinceStartOfDay(assignment.service_start_at), HOURS_IN_DAY * 60))
+                  const endMinutesRaw = assignment.service_end_at ? minutesSinceStartOfDay(assignment.service_end_at) : startMinutes + 60
+                  const endMinutes = Math.max(startMinutes + MIN_MINUTES_PER_BLOCK, Math.min(endMinutesRaw, HOURS_IN_DAY * 60))
+                  const durationMinutes = Math.max(MIN_MINUTES_PER_BLOCK, endMinutes - startMinutes)
+                  const top = startMinutes * minuteHeight
+                  const height = durationMinutes * minuteHeight
 
-                {/* Assignments for this day */}
-                <div className="space-y-1">
-                  {dayAssignments.slice(0, viewMode === 'week' ? 10 : 3).map(assignment => (
+                  return (
                     <div
                       key={assignment.id}
-                      className={`relative text-xs p-2 rounded border cursor-pointer transition-all hover:ring-2 hover:ring-blue-400 ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-blue-500' : ''}`}
-                      onClick={() => setSelectedAssignment(assignment)}
+                      className={`absolute left-4 right-4 p-3 rounded-lg border shadow-sm cursor-pointer transition-all hover:ring-2 hover:ring-blue-400 ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-blue-500' : ''}`}
+                      style={{ top: `${top}px`, height: `${height}px` }}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setSelectedAssignment(assignment)
+                      }}
                     >
-                      <div className="font-semibold truncate">
-                        {assignment.service_start_at && formatTime(assignment.service_start_at)}
+                      <div className="text-xs font-semibold uppercase tracking-wide text-gray-300">
+                        {assignment.employee?.profile?.full_name || 'Unassigned'}
                       </div>
-                      <div className="truncate">{assignment.job?.title || 'Untitled Job'}</div>
-                      {viewMode === 'week' && (
-                        <>
-                          <div className="truncate text-gray-400">
-                            {assignment.employee?.profile?.full_name || 'Unknown'}
-                          </div>
-                          <div className="truncate text-gray-400">
-                            {assignment.job?.customer?.name || 'No customer'}
-                          </div>
-                        </>
-                      )}
-                      {/* Click indicator */}
-                      <div className="absolute bottom-1 right-1 text-gray-500 hover:text-gray-300">
-                        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                        </svg>
+                      <div className="text-lg font-bold text-white truncate">
+                        {assignment.job?.title || 'Untitled Job'}
+                      </div>
+                      <div className="text-xs text-gray-300 mt-1">
+                        {assignment.job?.customer?.name || 'No customer'}
+                      </div>
+                      <div className="text-xs text-gray-300">
+                        {formatTimeRange(assignment.service_start_at, assignment.service_end_at)}
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-xs px-2 py-0.5 rounded bg-gray-900/60 border border-gray-700">
+                          {getStatusBadge(assignment.assignment_status)}
+                        </span>
                       </div>
                     </div>
-                  ))}
-                  {dayAssignments.length > (viewMode === 'week' ? 10 : 3) && (
-                    <div className="text-xs text-gray-500 pl-2">
-                      +{dayAssignments.length - (viewMode === 'week' ? 10 : 3)} more
-                    </div>
-                  )}
-                </div>
+                  )
+                })}
               </div>
-            )
-          })}
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+          {/* Day headers */}
+          <div className="grid grid-cols-7 gap-2 mb-4">
+            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+              <div key={day} className="text-center font-semibold text-gray-400 py-2">
+                {day}
+              </div>
+            ))}
+          </div>
 
+          {/* Calendar days */}
+          <div className="grid grid-cols-7 gap-2">
+            {calendarData.map((day, index) => {
+              const dayAssignments = getAssignmentsForDay(day)
+              const isTodayDate = isToday(day)
+              const isCurrentMonthDate = isCurrentMonth(day)
+
+              return (
+                <div
+                  key={index}
+                  className={`min-h-32 p-2 rounded-lg border cursor-pointer ${
+                    isTodayDate
+                      ? 'bg-blue-900/20 border-blue-500'
+                      : 'bg-gray-900 border-gray-700'
+                  } ${
+                    viewMode === 'month' && !isCurrentMonthDate
+                      ? 'opacity-40'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    handleDaySelection(day)
+                    setSelectedAssignment(null)
+                  }}
+                >
+                  <div className={`text-sm font-semibold mb-2 ${
+                    isTodayDate ? 'text-blue-400' : 'text-gray-400'
+                  }`}>
+                    {day.getDate()}
+                  </div>
+
+                  {/* Assignments for this day */}
+                  <div className="space-y-1">
+                    {dayAssignments.slice(0, viewMode === 'week' ? 10 : 3).map(assignment => (
+                      <div
+                        key={assignment.id}
+                        className={`relative text-xs p-2 rounded border cursor-pointer transition-all hover:ring-2 hover:ring-blue-400 ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-blue-500' : ''}`}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          handleDaySelection(day)
+                          setSelectedAssignment(assignment)
+                        }}
+                      >
+                        <div className="font-semibold truncate">
+                          {assignment.service_start_at && formatTime(assignment.service_start_at)}
+                        </div>
+                        <div className="truncate">{assignment.job?.title || 'Untitled Job'}</div>
+                        {viewMode === 'week' && (
+                          <>
+                            <div className="truncate text-gray-400">
+                              {assignment.employee?.profile?.full_name || 'Unknown'}
+                            </div>
+                            <div className="truncate text-gray-400">
+                              {assignment.job?.customer?.name || 'No customer'}
+                            </div>
+                          </>
+                        )}
+                        {/* Click indicator */}
+                        <div className="absolute bottom-1 right-1 text-gray-500 hover:text-gray-300">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a 1 1 0 001 1h1a 1 1 0 100-2v-3a 1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    ))}
+                    {dayAssignments.length > (viewMode === 'week' ? 10 : 3) && (
+                      <div className="text-xs text-gray-500 pl-2">
+                        +{dayAssignments.length - (viewMode === 'week' ? 10 : 3)} more
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
       {/* Job Details Panel */}
       {selectedAssignment && (
         <div className="bg-gray-800 shadow-lg rounded-lg border border-gray-700 overflow-hidden">

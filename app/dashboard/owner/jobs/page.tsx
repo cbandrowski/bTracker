@@ -12,6 +12,7 @@ export default function JobsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [jobs, setJobs] = useState<JobWithCustomer[]>([])
+  const [paidJobIds, setPaidJobIds] = useState<Set<string>>(new Set())
   const [loadingData, setLoadingData] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -61,6 +62,13 @@ export default function JobsPage() {
         }
 
         setJobs(response.data || [])
+
+        // Fetch paid job IDs
+        const paidResponse = await fetch('/api/jobs/paid')
+        if (paidResponse.ok) {
+          const { paidJobIds: paidIds } = await paidResponse.json()
+          setPaidJobIds(new Set(paidIds || []))
+        }
       } catch (error) {
         console.error('Error fetching jobs:', error)
       }
@@ -198,9 +206,12 @@ export default function JobsPage() {
     setSubmitting(false)
   }
 
-  const upcomingJobs = jobs.filter(job => job.status === 'upcoming')
-  const inProgressJobs = jobs.filter(job => job.status === 'in_progress')
-  const doneJobs = jobs.filter(job => job.status === 'done')
+  // Filter out paid jobs from all views
+  const unpaidJobs = jobs.filter(job => !paidJobIds.has(job.id))
+
+  const upcomingJobs = unpaidJobs.filter(job => job.status === 'upcoming')
+  const inProgressJobs = unpaidJobs.filter(job => job.status === 'in_progress')
+  const doneJobs = unpaidJobs.filter(job => job.status === 'done')
 
   if (loadingData) {
     return (

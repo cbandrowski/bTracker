@@ -16,29 +16,76 @@ export async function GET(
 
     const companyIds = await getUserCompanyIds(supabase, user.id)
 
-    // Fetch invoice with customer and company info
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
+    // Fetch invoice with computed status from v_invoice_summary
+    const { data: invoiceSummary, error: summaryError } = await supabase
+      .from('v_invoice_summary')
       .select(`
-        *,
-        customers (
-          name,
-          email,
-          phone,
-          billing_address,
-          billing_address_line_2,
-          billing_city,
-          billing_state,
-          billing_zipcode,
-          billing_country
-        )
+        invoice_id,
+        company_id,
+        customer_id,
+        invoice_number,
+        invoice_date,
+        due_date,
+        invoice_status,
+        computed_status,
+        total_amount,
+        total_paid,
+        balance_due,
+        notes,
+        terms,
+        issued_at,
+        paid_at,
+        voided_at,
+        created_at,
+        updated_at
       `)
-      .eq('id', invoiceId)
+      .eq('invoice_id', invoiceId)
       .in('company_id', companyIds)
       .single()
 
-    if (invoiceError || !invoice) {
+    if (summaryError || !invoiceSummary) {
       return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
+    }
+
+    // Fetch customer info separately
+    const { data: customer, error: customerError } = await supabase
+      .from('customers')
+      .select(`
+        name,
+        email,
+        phone,
+        billing_address,
+        billing_address_line_2,
+        billing_city,
+        billing_state,
+        billing_zipcode,
+        billing_country
+      `)
+      .eq('id', invoiceSummary.customer_id)
+      .single()
+
+    if (customerError) {
+      console.error('Error fetching customer:', customerError)
+    }
+
+    // Construct invoice object with computed status
+    const invoice = {
+      id: invoiceSummary.invoice_id,
+      company_id: invoiceSummary.company_id,
+      customer_id: invoiceSummary.customer_id,
+      invoice_number: invoiceSummary.invoice_number,
+      invoice_date: invoiceSummary.invoice_date,
+      due_date: invoiceSummary.due_date,
+      status: invoiceSummary.computed_status, // Use computed status
+      total_amount: invoiceSummary.total_amount,
+      notes: invoiceSummary.notes,
+      terms: invoiceSummary.terms,
+      issued_at: invoiceSummary.issued_at,
+      paid_at: invoiceSummary.paid_at,
+      voided_at: invoiceSummary.voided_at,
+      created_at: invoiceSummary.created_at,
+      updated_at: invoiceSummary.updated_at,
+      customers: customer,
     }
 
     // Fetch invoice lines with job information

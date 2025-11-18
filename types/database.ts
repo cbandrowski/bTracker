@@ -183,3 +183,79 @@ export interface JobAssignmentWithDetails extends JobAssignment {
   job?: Job
   employee?: CompanyEmployee & { profile?: Profile }
 }
+
+// =====================================================
+// SCHEDULE & TIME TRACKING TYPES
+// =====================================================
+
+export type ScheduleStatus = 'scheduled' | 'cancelled' | 'completed'
+export type TimeEntryStatus = 'pending_clock_in' | 'pending_approval' | 'approved' | 'rejected'
+
+export interface EmployeeSchedule {
+  id: string
+  company_id: string
+  employee_id: string
+  job_id: string | null
+
+  // Time fields
+  start_planned: string  // timestamptz
+  end_planned: string    // timestamptz
+
+  // Status and notes
+  status: ScheduleStatus
+  notes: string | null
+
+  // Metadata
+  created_at: string
+  updated_at: string
+}
+
+export interface TimeEntry {
+  id: string
+  company_id: string
+  employee_id: string
+  schedule_id: string | null
+
+  // Employee-reported times
+  clock_in_reported_at: string   // timestamptz
+  clock_out_reported_at: string | null
+
+  // Owner-approved times
+  clock_in_approved_at: string | null
+  clock_out_approved_at: string | null
+
+  // Status workflow
+  status: TimeEntryStatus
+
+  // Approval tracking
+  approved_by: string | null  // profile id
+  approved_at: string | null
+
+  // Edit tracking
+  edit_reason: string | null
+
+  // Metadata
+  created_at: string
+  updated_at: string
+}
+
+// Extended types with joined data
+export interface EmployeeScheduleWithDetails extends EmployeeSchedule {
+  employee?: CompanyEmployee & { profile?: Profile }
+  job?: Job & { customer?: Customer }
+  employee_name?: string
+  employee_email?: string
+  job_title?: string
+  customer_name?: string
+}
+
+export interface TimeEntryWithDetails extends TimeEntry {
+  employee?: CompanyEmployee & { profile?: Profile }
+  schedule?: EmployeeSchedule
+  job?: Job & { customer?: Customer }
+  employee_name?: string
+  employee_email?: string
+  job_title?: string
+  customer_name?: string
+  approver?: Profile
+}

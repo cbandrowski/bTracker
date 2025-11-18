@@ -30,6 +30,7 @@ export default function AssignmentsPage() {
   const [unassignedJobs, setUnassignedJobs] = useState<JobWithCustomer[]>([])
   const [assignments, setAssignments] = useState<JobAssignmentWithDetails[]>([])
   const [employees, setEmployees] = useState<EmployeeWithProfile[]>([])
+  const [paidJobIds, setPaidJobIds] = useState<Set<string>>(new Set())
   const [loadingData, setLoadingData] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [assigningJobId, setAssigningJobId] = useState<string | null>(null)
@@ -66,10 +67,24 @@ export default function AssignmentsPage() {
       const assignmentsResponse = await assignmentsService.getAll()
       setAssignments((assignmentsResponse.data as any) || [])
 
-      // Filter unassigned jobs (jobs with no assignments)
+      // Fetch paid job IDs
+      let paidJobIdsArray: string[] = []
+      try {
+        const paidResponse = await fetch('/api/jobs/paid')
+        if (paidResponse.ok) {
+          const { paidJobIds: paidIds } = await paidResponse.json()
+          paidJobIdsArray = paidIds || []
+          setPaidJobIds(new Set(paidJobIdsArray))
+        }
+      } catch (error) {
+        console.error('Error fetching paid jobs:', error)
+      }
+
+      // Filter unassigned jobs (jobs with no assignments and not paid)
       const assignedJobIds = new Set((assignmentsResponse.data || []).map((a: any) => a.job_id))
+      const paidJobIdsSet = new Set(paidJobIdsArray)
       const unassigned = allJobs.filter((job: any) =>
-        !assignedJobIds.has(job.id) && job.status !== 'done'
+        !assignedJobIds.has(job.id) && job.status !== 'done' && !paidJobIdsSet.has(job.id)
       )
       setUnassignedJobs(unassigned)
 
@@ -165,9 +180,12 @@ export default function AssignmentsPage() {
     }
   }
 
-  const assignedAssignments = assignments.filter(a => a.assignment_status === 'assigned')
-  const inProgressAssignments = assignments.filter(a => a.assignment_status === 'in_progress')
-  const doneAssignments = assignments.filter(a => a.assignment_status === 'done')
+  // Filter out assignments for paid jobs
+  const unpaidAssignments = assignments.filter(a => !paidJobIds.has(a.job_id))
+
+  const assignedAssignments = unpaidAssignments.filter(a => a.assignment_status === 'assigned')
+  const inProgressAssignments = unpaidAssignments.filter(a => a.assignment_status === 'in_progress')
+  const doneAssignments = unpaidAssignments.filter(a => a.assignment_status === 'done')
 
   // Group assignments by job
   const groupByJob = (assignments: JobAssignmentWithDetails[]) => {

@@ -139,6 +139,15 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       ),
+    },
+    {
+      label: 'Schedule & Time',
+      link: '/dashboard/owner/schedule-and-time/schedule',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
     },{
       label: 'Suppliers',
       link: '/dashboard/owner/suppliers',
@@ -160,10 +169,10 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
   ]
 
   return (
-    <div className="min-h-screen bg-black py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-black py-8 print:py-0 print:bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 print:px-0 print:max-w-none">
         {/* Header */}
-        <div className="bg-gray-900 shadow-lg rounded-lg mb-6 border border-gray-800">
+        <div className="bg-gray-900 shadow-lg rounded-lg mb-6 border border-gray-800 print:hidden">
           <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-gray-800">
             <div>
               <h1 className="text-2xl font-bold text-white">Owner Dashboard</h1>
@@ -184,12 +193,14 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
         </div>
 
         {/* Layout with Sidebar and Content */}
-        <div className="flex flex-col lg:flex-row gap-6">
-          <OwnerSidebar menu={menu} />
+        <div className="flex flex-col lg:flex-row gap-6 print:block print:gap-0">
+          <div className="print:hidden">
+            <OwnerSidebar menu={menu} />
+          </div>
 
           {/* Main Content */}
-          <main className="flex-1 bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
-            <div className="p-6">
+          <main className="flex-1 bg-gray-900 rounded-lg border border-gray-800 overflow-hidden print:border-0 print:rounded-none print:bg-white print:overflow-visible">
+            <div className="p-6 print:p-0">
               {children}
             </div>
           </main>

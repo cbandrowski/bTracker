@@ -1,11 +1,14 @@
+
 'use client'
 
-import React, { use, useState, useEffect } from 'react'
+import React, { use, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Download, Printer, Mail } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -21,6 +24,8 @@ export default function InvoiceViewPage({ params }: PageProps) {
   const [company, setCompany] = useState<any>(null)
   const [depositApplications, setDepositApplications] = useState<any[]>([])
   const [paymentApplications, setPaymentApplications] = useState<any[]>([])
+  const [downloadingPDF, setDownloadingPDF] = useState(false)
+  const invoiceRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function fetchInvoice() {
@@ -43,6 +48,110 @@ export default function InvoiceViewPage({ params }: PageProps) {
     }
     fetchInvoice()
   }, [invoiceId])
+
+  const handleDownloadPDF = async () => {
+    if (!invoiceRef.current || !invoice) {
+      console.error('Invoice ref or invoice data not available')
+      return
+    }
+
+    setDownloadingPDF(true)
+    try {
+      console.log('Starting PDF generation...')
+
+      // Temporarily add print media styles
+      const printStyle = document.createElement('style')
+      printStyle.id = 'pdf-print-styles'
+      printStyle.textContent = `
+        @media screen {
+          [data-invoice-content] * {
+            background-color: white !important;
+            color: black !important;
+          }
+          [data-invoice-content] .border-blue-600 {
+            border-color: #2563eb !important;
+          }
+          [data-invoice-content] .bg-blue-600 {
+            background-color: #2563eb !important;
+            color: white !important;
+          }
+          [data-invoice-content] .bg-gray-50 {
+            background-color: #f9fafb !important;
+          }
+          [data-invoice-content] .bg-gray-100 {
+            background-color: #f3f4f6 !important;
+          }
+          [data-invoice-content] .text-blue-600 {
+            color: #2563eb !important;
+          }
+          [data-invoice-content] .text-gray-600 {
+            color: #4b5563 !important;
+          }
+          [data-invoice-content] .text-gray-900 {
+            color: #111827 !important;
+          }
+        }
+      `
+      document.head.appendChild(printStyle)
+
+      // Capture the invoice element as canvas
+      const canvas = await html2canvas(invoiceRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+      })
+
+      // Remove the temporary style
+      document.getElementById('pdf-print-styles')?.remove()
+
+      console.log('Canvas created:', canvas.width, 'x', canvas.height)
+
+      // Calculate PDF dimensions
+      const imgWidth = 210 // A4 width in mm
+      const pageHeight = 297 // A4 height in mm
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
+
+      // Create PDF
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      })
+
+      const imgData = canvas.toDataURL('image/png', 1.0)
+      let position = 0
+
+      // Add first page
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight
+
+      // Add additional pages if needed
+      while (heightLeft > 0) {
+        position = heightLeft - imgHeight
+        pdf.addPage()
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight
+      }
+
+      // Create filename with customer name and invoice number
+      const customerName = invoice.customers?.name || 'Customer'
+      const invoiceNumber = invoice.invoice_number || invoiceId
+      const safeCustomerName = customerName.replace(/[^a-zA-Z0-9]/g, '_')
+      const filename = `Invoice_${invoiceNumber}_${safeCustomerName}.pdf`
+
+      console.log('Saving PDF as:', filename)
+      pdf.save(filename)
+      console.log('PDF saved successfully')
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setDownloadingPDF(false)
+    }
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -104,11 +213,28 @@ export default function InvoiceViewPage({ params }: PageProps) {
 
   const customer = invoice.customers
 
+  // Filter out backend-only lines (like "Services for job [uuid]" with $0)
+  const filteredLines = lines.filter(line => {
+    const desc = line.description?.toLowerCase() || ''
+    const amount = Number(line.unit_price || 0)
+
+    // Filter out "Services for job" lines with UUID pattern and $0 amount
+    if (desc.includes('service') && desc.includes('for job') && amount === 0) {
+      // Check if description contains a UUID pattern
+      const uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+      if (uuidPattern.test(line.description || '')) {
+        return false
+      }
+    }
+
+    return true
+  })
+
   // Group lines by job
   const groupedLines: { [key: string]: any[] } = {}
   const standaloneLines: any[] = []
 
-  lines.forEach(line => {
+  filteredLines.forEach(line => {
     if (line.job_id && line.jobs) {
       if (!groupedLines[line.job_id]) {
         groupedLines[line.job_id] = []
@@ -120,7 +246,7 @@ export default function InvoiceViewPage({ params }: PageProps) {
   })
 
   // Calculate subtotal (excluding deposits)
-  const subtotal = lines
+  const subtotal = filteredLines
     .filter(line => line.line_type !== 'deposit_applied')
     .reduce((sum, line) => {
       const lineTotal = Number(line.line_total || 0)
@@ -128,7 +254,7 @@ export default function InvoiceViewPage({ params }: PageProps) {
     }, 0)
 
   // Calculate tax
-  const taxTotal = lines
+  const taxTotal = filteredLines
     .filter(line => line.line_type !== 'deposit_applied')
     .reduce((sum, line) => {
       const lineTotal = Number(line.line_total || 0)
@@ -140,7 +266,7 @@ export default function InvoiceViewPage({ params }: PageProps) {
   const total = subtotal + taxTotal
 
   // Deposits applied (negative amounts)
-  const depositsApplied = lines
+  const depositsApplied = filteredLines
     .filter(line => line.line_type === 'deposit_applied')
     .reduce((sum, line) => sum + Math.abs(Number(line.line_total || 0)), 0)
 
@@ -151,58 +277,84 @@ export default function InvoiceViewPage({ params }: PageProps) {
   const balance = total - depositsApplied - paymentsApplied
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6">
-      {/* Header Actions */}
-      <div className="max-w-5xl mx-auto mb-6 flex items-center justify-between">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => router.back()}
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
-            <Mail className="h-4 w-4 mr-2" />
-            Email
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 print:p-0 print:bg-white print:min-h-0">
+        {/* Header Actions - Hidden when printing */}
+        <div className="max-w-5xl mx-auto mb-6 flex items-center justify-between print:hidden">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.back()}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
           </Button>
-          <Button variant="outline" size="sm" disabled>
-            <Download className="h-4 w-4 mr-2" />
-            Download PDF
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => window.print()}>
-            <Printer className="h-4 w-4 mr-2" />
-            Print
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled>
+              <Mail className="h-4 w-4 mr-2" />
+              Email
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadPDF}
+              disabled={downloadingPDF}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {downloadingPDF ? 'Generating...' : 'Download PDF'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <Printer className="h-4 w-4 mr-2" />
+              Print
+            </Button>
+          </div>
         </div>
-      </div>
 
       {/* Invoice Template */}
-      <div className="max-w-5xl mx-auto bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden print:shadow-none">
+      <div
+        ref={invoiceRef}
+        data-invoice-content
+        className="max-w-5xl mx-auto bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden print:shadow-none print:rounded-none print:bg-white print:max-w-none"
+      >
         {/* Invoice Header */}
-        <div className="border-b-4 border-blue-600 p-8 pb-6">
-          <div className="flex justify-between items-start">
-            {/* Company Info */}
-            <div>
-              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-                {company?.name || 'Company Name'}
-              </h1>
-              <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                {company?.address && <div>{company.address}</div>}
-                {company?.address_line_2 && <div>{company.address_line_2}</div>}
-                {company?.city && (
-                  <div>
-                    {company.city}, {company.state} {company.zipcode}
-                  </div>
-                )}
-                {company?.phone && <div>Phone: {company.phone}</div>}
-                {company?.email && <div>Email: {company.email}</div>}
+        <div className="border-b-4 border-blue-600 p-8 pb-6 print:bg-white">
+          <div className="flex justify-between items-start gap-6">
+            {/* Company Info with Logo */}
+            <div className="flex items-start gap-4 flex-1">
+              {/* Company Logo */}
+              {company?.logo_url && (
+                <div className="flex-shrink-0">
+                  <img
+                    src={company.logo_url}
+                    alt={company.name || 'Company Logo'}
+                    className="w-20 h-20 object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none'
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Company Details */}
+              <div>
+                <h1 className="text-4xl font-bold text-gray-900 dark:text-white print:text-gray-900 mb-2">
+                  {company?.name || 'Company Name'}
+                </h1>
+                <div className="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600 space-y-1">
+                  {company?.show_address_on_invoice && company?.address && <div>{company.address}</div>}
+                  {company?.show_address_on_invoice && company?.address_line_2 && <div>{company.address_line_2}</div>}
+                  {company?.show_address_on_invoice && company?.city && (
+                    <div>
+                      {company.city}, {company.state} {company.zipcode}
+                    </div>
+                  )}
+                  {company?.phone && <div>Phone: {company.phone}</div>}
+                  {company?.email && <div>Email: {company.email}</div>}
+                </div>
               </div>
             </div>
 
             {/* Invoice Info */}
-            <div className="text-right">
+            <div className="text-right flex-shrink-0">
               <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
                 INVOICE
               </h2>
@@ -517,8 +669,8 @@ export default function InvoiceViewPage({ params }: PageProps) {
         )}
 
         {/* Footer */}
-        <div className="bg-gray-50 dark:bg-gray-900 px-8 py-6 text-center border-t border-gray-200 dark:border-gray-700">
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+        <div className="bg-gray-50 dark:bg-gray-900 px-8 py-6 text-center border-t border-gray-200 dark:border-gray-700 print:bg-white print:border-gray-300">
+          <p className="text-xs text-gray-500 dark:text-gray-400 print:text-gray-600">
             Thank you for your business!
           </p>
         </div>
