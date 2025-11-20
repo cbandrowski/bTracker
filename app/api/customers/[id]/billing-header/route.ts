@@ -69,22 +69,26 @@ export async function GET(
       return NextResponse.json({ error: balanceError.message }, { status: 500 })
     }
 
-    // Count open invoices (not paid, not void, not cancelled)
+    // Count open invoices - use v_invoice_summary to check balance_due instead of status
+    // An invoice is "open" if it has a balance due > 0 and is not void/cancelled/draft
     const { data: invoices, error: invoicesError } = await supabase
-      .from('invoices')
-      .select('id, status')
+      .from('v_invoice_summary')
+      .select('balance_due, invoice_status')
       .eq('customer_id', customerId)
       .eq('company_id', companyId)
-      .not('status', 'in', '(void,cancelled,paid)')
+      .not('invoice_status', 'in', '(void,cancelled,draft)')
 
     if (invoicesError) {
       console.error('Error counting invoices:', invoicesError)
     }
 
+    // Count invoices with outstanding balance
+    const openInvoicesCount = invoices?.filter(inv => Number(inv.balance_due) > 0).length || 0
+
     return NextResponse.json({
       billedBalance: Number(balanceData?.billed_balance || 0),
       unappliedCredit: Number(balanceData?.unapplied_credit || 0),
-      openInvoices: invoices?.length || 0,
+      openInvoices: openInvoicesCount,
     })
   } catch (error) {
     console.error('Unexpected error:', error)

@@ -14,6 +14,7 @@ const GetTimeEntriesQuerySchema = z.object({
   end_date: z.string().optional(),
   employee_id: z.string().uuid().optional(),
   status: z.enum(['pending_clock_in', 'pending_approval', 'approved', 'rejected', 'all']).optional(),
+  exclude_payroll: z.enum(['true', 'false']).optional(), // Filter out entries already in payroll
 })
 
 export async function GET(request: NextRequest) {
@@ -39,6 +40,7 @@ export async function GET(request: NextRequest) {
       end_date: searchParams.get('end_date') || undefined,
       employee_id: searchParams.get('employee_id') || undefined,
       status: searchParams.get('status') || undefined,
+      exclude_payroll: searchParams.get('exclude_payroll') || undefined,
     })
 
     // Build query - use the v_pending_time_entries view for joined data or base table
@@ -101,6 +103,11 @@ export async function GET(request: NextRequest) {
     } else {
       // Default to showing only pending entries if no status specified
       dbQuery = dbQuery.in('status', ['pending_clock_in', 'pending_approval'])
+    }
+
+    // Filter out entries already in payroll if requested
+    if (query.exclude_payroll === 'true') {
+      dbQuery = dbQuery.is('payroll_run_id', null)
     }
 
     const { data, error } = await dbQuery

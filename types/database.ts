@@ -259,3 +259,15 @@ export interface TimeEntryWithDetails extends TimeEntry {
   customer_name?: string
   approver?: Profile
 }
+
+export interface EmployeeAvailability {
+  id: string
+  company_id: string
+  company_employee_id: string
+  day_of_week: number
+  is_available: boolean
+  start_time: string | null
+  end_time: string | null
+  created_at: string
+  updated_at: string
+}

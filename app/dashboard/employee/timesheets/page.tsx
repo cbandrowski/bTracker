@@ -33,7 +33,7 @@ interface TimeEntriesResponse {
   to_date: string
 }
 
-type ViewMode = 'day' | 'week'
+type ViewMode = 'day' | 'week' | 'month'
 
 export default function TimesheetsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('week')
@@ -71,6 +71,8 @@ export default function TimesheetsPage() {
 
     if (viewMode === 'day') {
       return format(from, 'MMMM d, yyyy')
+    } else if (viewMode === 'month') {
+      return format(from, 'MMMM yyyy')
     } else {
       return `${format(from, 'MMM d')} - ${format(to, 'MMM d, yyyy')}`
     }
@@ -121,7 +123,7 @@ export default function TimesheetsPage() {
                   : 'text-gray-300 hover:text-white'
               }`}
             >
-              Today
+              Day
             </button>
             <button
               onClick={() => setViewMode('week')}
@@ -131,7 +133,17 @@ export default function TimesheetsPage() {
                   : 'text-gray-300 hover:text-white'
               }`}
             >
-              This Week
+              Week
+            </button>
+            <button
+              onClick={() => setViewMode('month')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'month'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              Month
             </button>
           </div>
         </div>
@@ -149,7 +161,9 @@ export default function TimesheetsPage() {
             <div className="text-5xl font-bold text-white mb-2">
               {data?.total_hours.toFixed(1) || '0.0'}
             </div>
-            <div className="text-lg text-gray-300">Total Hours</div>
+            <div className="text-lg text-gray-300">
+              Total {viewMode === 'day' ? 'Daily' : viewMode === 'week' ? 'Weekly' : 'Monthly'} Hours
+            </div>
             {data && data.time_entries.length > 0 && (
               <div className="mt-4 text-sm text-gray-400">
                 {data.time_entries.length} time {data.time_entries.length === 1 ? 'entry' : 'entries'}

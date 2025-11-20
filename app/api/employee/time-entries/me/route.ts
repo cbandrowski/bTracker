@@ -7,11 +7,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, getCurrentUser } from '@/lib/supabaseServer'
 import { z } from 'zod'
-import { startOfDay, endOfDay, startOfWeek, endOfWeek } from 'date-fns'
+import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 
 // Validation schema for query parameters
 const GetMyTimeEntriesQuerySchema = z.object({
-  view: z.enum(['day', 'week', 'custom']).optional(),
+  view: z.enum(['day', 'week', 'month', 'custom']).optional(),
   from_date: z.string().optional(),
   to_date: z.string().optional(),
 })
@@ -54,6 +54,9 @@ export async function GET(request: NextRequest) {
     } else if (query.view === 'week') {
       fromDate = startOfWeek(new Date(), { weekStartsOn: 0 })
       toDate = endOfWeek(new Date(), { weekStartsOn: 0 })
+    } else if (query.view === 'month') {
+      fromDate = startOfMonth(new Date())
+      toDate = endOfMonth(new Date())
     } else if (query.from_date && query.to_date) {
       fromDate = new Date(query.from_date)
       toDate = new Date(query.to_date)
@@ -63,7 +66,7 @@ export async function GET(request: NextRequest) {
       toDate = endOfWeek(new Date(), { weekStartsOn: 0 })
     }
 
-    // Fetch time entries
+    // Fetch time entries (exclude rejected entries)
     const { data, error } = await supabase
       .from('time_entries')
       .select(`
@@ -84,6 +87,7 @@ export async function GET(request: NextRequest) {
       `)
       .eq('employee_id', employee.id)
       .eq('company_id', employee.company_id)
+      .neq('status', 'rejected')
       .gte('clock_in_reported_at', fromDate.toISOString())
       .lte('clock_in_reported_at', toDate.toISOString())
       .order('clock_in_reported_at', { ascending: false })

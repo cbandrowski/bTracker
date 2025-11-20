@@ -1,0 +1,113 @@
+'use client'
+
+import { Customer } from '@/types/customer-details'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { ArrowLeft, Plus, FileText, CreditCard, Edit } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+
+interface CustomerHeaderProps {
+  customer: Customer
+  onEditClick?: () => void
+}
+
+export function CustomerHeader({ customer, onEditClick }: CustomerHeaderProps) {
+  const router = useRouter()
+  const [isActive] = useState(true) // TODO: Add customer status to schema if needed
+
+  const handleNewJob = () => {
+    // TODO: Navigate to job creation with prefilled customerId
+    router.push(`/dashboard/owner/jobs/new?customerId=${customer.id}`)
+  }
+
+  const handleNewInvoice = () => {
+    // TODO: Navigate to invoice creation with prefilled customerId
+    router.push(`/dashboard/owner/invoices/new?customerId=${customer.id}`)
+  }
+
+  const handleAddPayment = () => {
+    // TODO: Open payment drawer or navigate to payment page
+    router.push(`/dashboard/owner/customers/${customer.id}/billing`)
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg border shadow-sm p-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        {/* Left side: Customer info */}
+        <div className="flex items-start gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/dashboard/owner/customers')}
+            className="mt-1"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                {customer.name}
+              </h1>
+              {isActive && (
+                <Badge variant="default">Active</Badge>
+              )}
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+              {customer.phone && (
+                <span className="flex items-center gap-1">
+                  <span className="font-medium">Phone:</span> {customer.phone}
+                </span>
+              )}
+              {customer.email && (
+                <span className="flex items-center gap-1">
+                  <span className="font-medium">Email:</span> {customer.email}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right side: Action buttons */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNewJob}
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            New Job
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNewInvoice}
+          >
+            <FileText className="h-4 w-4 mr-1" />
+            New Invoice
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleAddPayment}
+          >
+            <CreditCard className="h-4 w-4 mr-1" />
+            Add Payment
+          </Button>
+
+          <Button
+            variant="default"
+            size="sm"
+            onClick={onEditClick}
+          >
+            <Edit className="h-4 w-4 mr-1" />
+            Edit Customer
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}

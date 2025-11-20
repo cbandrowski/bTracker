@@ -77,6 +77,7 @@ export default function ApprovalsPage() {
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),
           status: statusFilter,
+          exclude_payroll: 'true', // Only show entries not yet in payroll
         })
 
         if (selectedEmployeeId) {
@@ -135,6 +136,7 @@ export default function ApprovalsPage() {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         status: statusFilter,
+        exclude_payroll: 'true',
       })
       if (selectedEmployeeId) {
         params.append('employee_id', selectedEmployeeId)
@@ -169,6 +171,7 @@ export default function ApprovalsPage() {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         status: statusFilter,
+        exclude_payroll: 'true',
       })
       if (selectedEmployeeId) {
         params.append('employee_id', selectedEmployeeId)
@@ -206,6 +209,7 @@ export default function ApprovalsPage() {
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         status: statusFilter,
+        exclude_payroll: 'true',
       })
       if (selectedEmployeeId) {
         params.append('employee_id', selectedEmployeeId)

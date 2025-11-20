@@ -5,8 +5,28 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
+
+function LiveHoursDisplay({ clockIn }: { clockIn: string }) {
+  const [hours, setHours] = useState('')
+
+  useEffect(() => {
+    const updateHours = () => {
+      const start = new Date(clockIn)
+      const now = new Date()
+      const diff = (now.getTime() - start.getTime()) / (1000 * 60 * 60)
+      setHours(diff.toFixed(2))
+    }
+
+    updateHours()
+    const interval = setInterval(updateHours, 1000) // Update every second
+
+    return () => clearInterval(interval)
+  }, [clockIn])
+
+  return <span className="text-blue-400">{hours}h (live)</span>
+}
 
 interface TimeEntry {
   id: string
@@ -19,6 +39,8 @@ interface TimeEntry {
   }
   clock_in_reported_at: string
   clock_out_reported_at: string | null
+  clock_in_approved_at?: string | null
+  clock_out_approved_at?: string | null
   status: 'pending_clock_in' | 'pending_approval' | 'approved' | 'rejected'
   schedule?: {
     job?: {
@@ -139,7 +161,7 @@ export default function ApprovalsTable({
   }
 
   const calculateHours = (clockIn: string, clockOut: string | null) => {
-    if (!clockOut) return 'In progress'
+    if (!clockOut) return null // Will show live component
     const start = new Date(clockIn)
     const end = new Date(clockOut)
     const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60)
@@ -273,19 +295,48 @@ export default function ApprovalsTable({
                     )}
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-300">
-                    {calculateHours(entry.clock_in_reported_at, entry.clock_out_reported_at)}
+                    {(() => {
+                      const hours = calculateHours(entry.clock_in_reported_at, entry.clock_out_reported_at)
+                      return hours !== null ? hours : <LiveHoursDisplay clockIn={entry.clock_in_reported_at} />
+                    })()}
                   </td>
                   <td className="px-4 py-4 text-sm text-gray-300">{jobTitle}</td>
                   <td className="px-4 py-4">
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => handleApprove(entry.id)}
-                        disabled={isProcessing}
-                        className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50"
-                        title={!entry.clock_out_reported_at ? 'Approve clock-in (employee still working)' : 'Approve completed shift'}
-                      >
-                        Approve
-                      </button>
+                    {(() => {
+                      // Determine what needs approval
+                      const clockInApproved = !!entry.clock_in_approved_at
+                      const clockOutReported = !!entry.clock_out_reported_at
+                      const clockOutApproved = !!entry.clock_out_approved_at
+
+                      let statusLabel = 'Needs Approval'
+                      let statusColor = 'bg-yellow-900 bg-opacity-50 text-yellow-200 border border-yellow-700'
+
+                      if (clockInApproved && clockOutReported && !clockOutApproved) {
+                        statusLabel = 'Clock-Out Needs Approval'
+                        statusColor = 'bg-red-900 bg-opacity-50 text-red-200 border border-red-700'
+                      } else if (clockInApproved && !clockOutReported) {
+                        statusLabel = 'Clock-In Approved'
+                        statusColor = 'bg-green-900 bg-opacity-50 text-green-200 border border-green-700'
+                      }
+
+                      return (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded mb-2 ${statusColor}`}>
+                          {statusLabel}
+                        </span>
+                      )
+                    })()}
+                  </td>
+                  {!readonly && (
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => handleApprove(entry.id)}
+                          disabled={isProcessing}
+                          className="px-3 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700 disabled:opacity-50"
+                          title={!entry.clock_out_reported_at ? 'Approve clock-in (employee still working)' : 'Approve completed shift'}
+                        >
+                          Approve
+                        </button>
                       <div className="flex gap-1">
                         <input
                           type="text"
@@ -307,6 +358,7 @@ export default function ApprovalsTable({
                       </div>
                     </div>
                   </td>
+                  )}
                 </tr>
               )
             })}

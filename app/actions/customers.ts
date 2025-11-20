@@ -87,18 +87,22 @@ export async function getCustomerBillingHeader(customerId: string) {
     .in('company_id', companyIds)
     .single()
 
-  // Count open invoices
+  // Count open invoices - use v_invoice_summary to check balance_due instead of status
+  // An invoice is "open" if it has a balance due > 0 and is not void/cancelled/draft
   const { data: invoices } = await supabase
-    .from('invoices')
-    .select('id')
+    .from('v_invoice_summary')
+    .select('balance_due, invoice_status')
     .eq('customer_id', customerId)
     .in('company_id', companyIds)
-    .not('status', 'in', '(void,cancelled,paid)')
+    .not('invoice_status', 'in', '(void,cancelled,draft)')
+
+  // Count invoices with outstanding balance
+  const openInvoicesCount = invoices?.filter(inv => Number(inv.balance_due) > 0).length || 0
 
   return {
     billedBalance: Number(balanceData?.billed_balance || 0),
     unappliedCredit: Number(balanceData?.unapplied_credit || 0),
-    openInvoices: invoices?.length || 0,
+    openInvoices: openInvoicesCount,
   }
 }
 

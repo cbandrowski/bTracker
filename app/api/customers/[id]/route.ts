@@ -1,5 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import { z } from 'zod'
+
+const updateCustomerSchema = z.object({
+  name: z.string().min(1).optional(),
+  phone: z.string().nullable().optional(),
+  email: z.string().email().nullable().optional(),
+  billing_address: z.string().nullable().optional(),
+  billing_address_line_2: z.string().nullable().optional(),
+  billing_city: z.string().nullable().optional(),
+  billing_state: z.string().nullable().optional(),
+  billing_zipcode: z.string().nullable().optional(),
+  billing_country: z.string().nullable().optional(),
+  service_address: z.string().nullable().optional(),
+  service_address_line_2: z.string().nullable().optional(),
+  service_city: z.string().nullable().optional(),
+  service_state: z.string().nullable().optional(),
+  service_zipcode: z.string().nullable().optional(),
+  service_country: z.string().nullable().optional(),
+  same_as_billing: z.boolean().optional(),
+  notes: z.string().nullable().optional(),
+})
 
 // GET /api/customers/[id] - Get a single customer
 export async function GET(
@@ -54,6 +75,19 @@ export async function PUT(
     }
 
     const body = await request.json()
+
+    // Validate input
+    const validationResult = updateCustomerSchema.safeParse(body)
+    if (!validationResult.success) {
+      return NextResponse.json(
+        {
+          error: 'Validation error',
+          details: validationResult.error.issues
+        },
+        { status: 400 }
+      )
+    }
+
     const companyIds = await getUserCompanyIds(supabase, user.id)
 
     // Verify customer belongs to user's company
@@ -69,7 +103,10 @@ export async function PUT(
 
     const { data, error } = await supabase
       .from('customers')
-      .update(body)
+      .update({
+        ...validationResult.data,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', id)
       .select()
       .single()

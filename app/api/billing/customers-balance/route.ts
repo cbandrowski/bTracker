@@ -34,21 +34,21 @@ export async function GET() {
       return NextResponse.json({ error: 'Failed to fetch balances' }, { status: 500 })
     }
 
-    // Get open invoices count per customer
+    // Get open invoices count per customer - use v_invoice_summary for accurate balance_due
     const { data: invoices, error: invoicesError } = await supabase
-      .from('invoices')
-      .select('customer_id, status, total, paid_amount')
+      .from('v_invoice_summary')
+      .select('customer_id, invoice_status, balance_due')
       .in('company_id', companyIds)
-      .not('status', 'in', '(void,cancelled,paid)')
+      .not('invoice_status', 'in', '(void,cancelled,draft)')
 
     if (invoicesError) {
       console.error('Error fetching invoices:', invoicesError)
     }
 
-    // Group open invoices by customer
+    // Group open invoices by customer (only count invoices with balance > 0)
     const openInvoicesByCustomer: Record<string, number> = {}
     invoices?.forEach(invoice => {
-      const balance = invoice.total - invoice.paid_amount
+      const balance = Number(invoice.balance_due) || 0
       if (balance > 0) {
         openInvoicesByCustomer[invoice.customer_id] =
           (openInvoicesByCustomer[invoice.customer_id] || 0) + 1

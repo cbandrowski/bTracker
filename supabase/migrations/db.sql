@@ -51,6 +51,7 @@ CREATE TABLE public.company_employees (
   updated_at timestamp with time zone DEFAULT now(),
   approval_status text NOT NULL DEFAULT 'pending'::text CHECK (approval_status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text])),
   work_status text NOT NULL DEFAULT 'available'::text CHECK (work_status = ANY (ARRAY['available'::text, 'inactive'::text, 'vacation'::text, 'sick'::text])),
+  hourly_rate numeric DEFAULT 15.00,
   CONSTRAINT company_employees_pkey PRIMARY KEY (id),
   CONSTRAINT company_employees_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id),
   CONSTRAINT company_employees_profile_id_fkey FOREIGN KEY (profile_id) REFERENCES public.profiles(id)
@@ -112,6 +113,22 @@ CREATE TABLE public.customers (
   updated_at timestamp with time zone DEFAULT now(),
   CONSTRAINT customers_pkey PRIMARY KEY (id),
   CONSTRAINT customers_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id)
+);
+CREATE TABLE public.employee_schedules (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL,
+  employee_id uuid NOT NULL,
+  job_id uuid,
+  start_planned timestamp with time zone NOT NULL,
+  end_planned timestamp with time zone NOT NULL,
+  status USER-DEFINED NOT NULL DEFAULT 'scheduled'::schedule_status,
+  notes text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT employee_schedules_pkey PRIMARY KEY (id),
+  CONSTRAINT employee_schedules_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id),
+  CONSTRAINT employee_schedules_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.company_employees(id),
+  CONSTRAINT employee_schedules_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.jobs(id)
 );
 CREATE TABLE public.invoice_lines (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -231,6 +248,40 @@ CREATE TABLE public.payments (
   CONSTRAINT payments_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id),
   CONSTRAINT payments_job_id_fkey FOREIGN KEY (job_id) REFERENCES public.jobs(id)
 );
+CREATE TABLE public.payroll_run_lines (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  payroll_run_id uuid NOT NULL,
+  employee_id uuid NOT NULL,
+  total_regular_hours numeric DEFAULT 0.00,
+  total_overtime_hours numeric DEFAULT 0.00,
+  hourly_rate_snapshot numeric NOT NULL,
+  overtime_rate_multiplier numeric DEFAULT 1.5,
+  regular_pay numeric DEFAULT 0.00,
+  overtime_pay numeric DEFAULT 0.00,
+  total_gross_pay numeric DEFAULT 0.00,
+  tax_withheld numeric,
+  other_deductions numeric,
+  net_pay numeric,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT payroll_run_lines_pkey PRIMARY KEY (id),
+  CONSTRAINT payroll_run_lines_payroll_run_id_fkey FOREIGN KEY (payroll_run_id) REFERENCES public.payroll_runs(id),
+  CONSTRAINT payroll_run_lines_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.company_employees(id)
+);
+CREATE TABLE public.payroll_runs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL,
+  period_start date NOT NULL,
+  period_end date NOT NULL,
+  status text NOT NULL DEFAULT 'draft'::text CHECK (status = ANY (ARRAY['draft'::text, 'finalized'::text])),
+  total_gross_pay numeric DEFAULT 0.00,
+  created_by uuid,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  CONSTRAINT payroll_runs_pkey PRIMARY KEY (id),
+  CONSTRAINT payroll_runs_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id),
+  CONSTRAINT payroll_runs_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.profiles(id)
+);
 CREATE TABLE public.profiles (
   id uuid NOT NULL,
   full_name text NOT NULL,
@@ -259,4 +310,30 @@ CREATE TABLE public.request_idempotency (
   response_body jsonb NOT NULL,
   created_at timestamp with time zone DEFAULT now(),
   CONSTRAINT request_idempotency_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.time_entries (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  company_id uuid NOT NULL,
+  employee_id uuid NOT NULL,
+  schedule_id uuid,
+  clock_in_reported_at timestamp with time zone NOT NULL,
+  clock_out_reported_at timestamp with time zone,
+  clock_in_approved_at timestamp with time zone,
+  clock_out_approved_at timestamp with time zone,
+  status USER-DEFINED NOT NULL DEFAULT 'pending_clock_in'::time_entry_status,
+  approved_by uuid,
+  approved_at timestamp with time zone,
+  edit_reason text,
+  created_at timestamp with time zone DEFAULT now(),
+  updated_at timestamp with time zone DEFAULT now(),
+  payroll_run_id uuid,
+  regular_hours numeric,
+  overtime_hours numeric,
+  gross_pay numeric,
+  CONSTRAINT time_entries_pkey PRIMARY KEY (id),
+  CONSTRAINT time_entries_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id),
+  CONSTRAINT time_entries_employee_id_fkey FOREIGN KEY (employee_id) REFERENCES public.company_employees(id),
+  CONSTRAINT time_entries_schedule_id_fkey FOREIGN KEY (schedule_id) REFERENCES public.employee_schedules(id),
+  CONSTRAINT time_entries_approved_by_fkey FOREIGN KEY (approved_by) REFERENCES public.profiles(id),
+  CONSTRAINT time_entries_payroll_run_id_fkey FOREIGN KEY (payroll_run_id) REFERENCES public.payroll_runs(id)
 );

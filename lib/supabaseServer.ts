@@ -66,3 +66,5 @@ export async function getUserCompanyIds(
 
   return data?.map((d) => d.company_id) || []
 }
+
+export type SupabaseServerClient = Awaited<ReturnType<typeof createServerClient>>

@@ -34,25 +34,31 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if employee already has an open time entry (no clock out, not rejected)
-    const { data: openEntry, error: openError } = await supabase
+    const { data: openEntries, error: openError } = await supabase
       .from('time_entries')
       .select('id, clock_in_reported_at, status')
       .eq('employee_id', employee.id)
       .eq('company_id', employee.company_id)
       .is('clock_out_reported_at', null)
       .neq('status', 'rejected')
-      .maybeSingle()
 
     if (openError) {
-      console.error('Error checking open entries:', openError)
+      console.error('[Clock In] Error checking open entries:', openError)
       return NextResponse.json({ error: 'Failed to check clock status' }, { status: 500 })
     }
 
-    if (openEntry) {
+    if (openEntries && openEntries.length > 0) {
+      const mostRecent = openEntries[0]
+      console.log('[Clock In] Employee already has open entry:', {
+        count: openEntries.length,
+        most_recent_id: mostRecent.id,
+        clock_in: mostRecent.clock_in_reported_at
+      })
       return NextResponse.json(
         {
           error: 'Already clocked in',
-          clock_in_at: openEntry.clock_in_reported_at
+          clock_in_at: mostRecent.clock_in_reported_at,
+          open_entries_count: openEntries.length
         },
         { status: 400 }
       )

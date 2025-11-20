@@ -47,7 +47,7 @@ export default function TimeEntriesPage() {
   const [startDate, setStartDate] = useState(startOfMonth(new Date()))
   const [endDate, setEndDate] = useState(endOfMonth(new Date()))
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<'approved' | 'rejected' | 'all'>('approved')
+  const [statusFilter, setStatusFilter] = useState<'approved' | 'rejected' | 'pending_approval' | 'pending_clock_in' | 'all'>('approved')
 
   const [timeEntries, setTimeEntries] = useState<TimeEntry[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
@@ -84,6 +84,7 @@ export default function TimeEntriesPage() {
           start_date: startDate.toISOString(),
           end_date: endDate.toISOString(),
           status: statusFilter,
+          exclude_payroll: 'true', // Only show entries not yet in payroll
         })
 
         if (selectedEmployeeId) {
@@ -226,8 +227,10 @@ export default function TimeEntriesPage() {
                 className="px-3 py-2 bg-gray-700 border border-gray-600 text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="approved">Approved</option>
+                <option value="pending_approval">Pending Approval</option>
+                <option value="pending_clock_in">Currently Clocked In</option>
                 <option value="rejected">Rejected</option>
-                <option value="all">All</option>
+                <option value="all">All Statuses</option>
               </select>
             </div>
           </div>

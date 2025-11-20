@@ -1,8 +1,8 @@
 // Frontend service layer for API calls
 // Provides type-safe methods for all backend API routes
 
-import { api } from './api'
-import { Customer, Job, JobAssignment, CompanyEmployee, Company, JobWithCustomer } from '@/types/database'
+import { api } from '../api'
+import { Customer, Job, JobAssignment, CompanyEmployee, Company, JobWithCustomer, Profile } from '@/types/database'
 
 // ============================================================================
 // CUSTOMERS SERVICE
@@ -115,6 +115,12 @@ export const employeesService = {
   // Get all employees
   async getAll() {
     return api.get<(CompanyEmployee & { profile?: any })[]>('/employees')
+  },
+
+  async getById(id: string) {
+    return api.get<{ employee: CompanyEmployee & { profile?: Profile | null } }>(
+      `/employees/${id}`
+    )
   },
 }
 
