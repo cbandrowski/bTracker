@@ -31,7 +31,6 @@ supabase/migrations/<timestamp>_<change_name>.sql
 
 types/database.ts
 
-
 	•	All queries and responses must use database types (never any).
 
 ⸻
