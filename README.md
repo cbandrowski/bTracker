@@ -125,9 +125,19 @@ npm run dev
 
 ### Environment Variables
 
+Use a single `.env` file at the repo root (do not use `.env.local` or `.env.dev`). Start by copying the template and filling in your real values:
+
+```
+cp .env.example .env
+```
+
+Required keys:
+
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SITE_URL=
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 EMAIL_PROVIDER_KEY=
 DOMAIN_URL=
