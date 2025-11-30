@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { EmployeeSidebar } from '@/components/dashboard/EmployeeSidebar'
+import { Shield, LogOut, Clock, HourglassIcon } from 'lucide-react'
 
 export default function EmployeeLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth()
@@ -68,8 +69,8 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
 
   if (loading || isEmployee === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="text-xl text-white">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-cyan-900 via-slate-900 to-teal-950 flex items-center justify-center">
+        <div className="text-xl text-cyan-200">Loading your quest...</div>
       </div>
     )
   }
@@ -77,25 +78,25 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   // Show pending approval screen
   if (approvalStatus === 'pending') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="min-h-screen bg-gradient-to-br from-cyan-900 via-slate-900 to-teal-950 flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
-          <div className="bg-yellow-900/20 border-2 border-yellow-600 rounded-lg p-8">
-            <svg className="w-16 h-16 text-yellow-400 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-            </svg>
-            <h2 className="text-2xl font-bold text-yellow-400 mb-2">Pending Approval</h2>
-            <p className="text-gray-300 mb-4">
-              Your account is waiting for approval from your company administrator.
+          <div className="bg-slate-800/50 backdrop-blur-md border-2 border-amber-500/50 rounded-xl p-8">
+            <HourglassIcon className="w-16 h-16 text-amber-400 mx-auto mb-4" />
+            <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400 mb-2">
+              Awaiting Guild Approval
+            </h2>
+            <p className="text-cyan-200 mb-4">
+              Your request to join the guild is being reviewed by your guild master.
             </p>
-            <p className="text-gray-400 text-sm">
-              You'll receive access once your account has been approved.
+            <p className="text-cyan-300/70 text-sm">
+              You'll gain access to your warrior dashboard once approved.
             </p>
             <button
               onClick={async () => {
                 await supabase.auth.signOut()
                 router.push('/login')
               }}
-              className="mt-6 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+              className="mt-6 px-6 py-2 bg-slate-700/50 text-cyan-200 rounded-lg hover:bg-slate-600/50 transition-colors border border-cyan-500/30"
             >
               Sign Out
             </button>
@@ -108,25 +109,25 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   // Show rejected screen
   if (approvalStatus === 'rejected') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
+      <div className="min-h-screen bg-gradient-to-br from-cyan-900 via-slate-900 to-teal-950 flex items-center justify-center">
         <div className="max-w-md mx-auto text-center">
-          <div className="bg-red-900/20 border-2 border-red-600 rounded-lg p-8">
-            <svg className="w-16 h-16 text-red-400 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-            </svg>
-            <h2 className="text-2xl font-bold text-red-400 mb-2">Access Denied</h2>
-            <p className="text-gray-300 mb-4">
-              Your account access has been denied by your company administrator.
+          <div className="bg-slate-800/50 backdrop-blur-md border-2 border-red-500/50 rounded-xl p-8">
+            <Shield className="w-16 h-16 text-red-400 mx-auto mb-4" />
+            <h2 className="text-3xl font-bold text-red-400 mb-2">
+              Access Denied
+            </h2>
+            <p className="text-cyan-200 mb-4">
+              Your guild application has been declined by your guild master.
             </p>
-            <p className="text-gray-400 text-sm">
-              Please contact your administrator for more information.
+            <p className="text-cyan-300/70 text-sm">
+              Please contact your guild master for more information.
             </p>
             <button
               onClick={async () => {
                 await supabase.auth.signOut()
                 router.push('/login')
               }}
-              className="mt-6 px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+              className="mt-6 px-6 py-2 bg-slate-700/50 text-cyan-200 rounded-lg hover:bg-slate-600/50 transition-colors border border-cyan-500/30"
             >
               Sign Out
             </button>
@@ -196,7 +197,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
       ),
     },
     {
-      label: 'Job Assignments',
+      label: 'Quest Board',
       link: '/dashboard/employee/schedule',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -225,14 +226,25 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
   ]
 
   return (
-    <div className="min-h-screen bg-black py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-900 via-slate-900 to-teal-950 py-8 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-20 w-96 h-96 bg-cyan-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Header */}
-        <div className="bg-gray-900 shadow-lg rounded-lg mb-6 border border-gray-800">
-          <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-gray-800">
+        <div className="bg-slate-800/50 backdrop-blur-md shadow-2xl rounded-xl border border-cyan-500/30 mb-6">
+          <div className="px-6 py-5 flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-white">Employee Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-400">
+              <div className="flex items-center gap-3 mb-1">
+                <Shield className="h-8 w-8 text-cyan-400" />
+                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">
+                  Warrior Dashboard
+                </h1>
+              </div>
+              <p className="mt-1 text-sm text-cyan-200">
                 Welcome back, {profile?.full_name || user?.email}!
               </p>
             </div>
@@ -241,8 +253,9 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
                 await supabase.auth.signOut()
                 router.push('/login')
               }}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="flex items-center gap-2 px-5 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all shadow-lg"
             >
+              <LogOut className="h-4 w-4" />
               Sign Out
             </button>
           </div>
@@ -253,7 +266,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
           <EmployeeSidebar menu={menu} />
 
           {/* Main Content */}
-          <main className="flex-1 bg-gray-900 rounded-lg border border-gray-800 overflow-hidden">
+          <main className="flex-1 bg-slate-800/50 backdrop-blur-md rounded-xl border border-cyan-500/30 overflow-hidden shadow-2xl">
             <div className="p-6">
               {children}
             </div>

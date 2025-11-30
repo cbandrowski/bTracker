@@ -1,34 +1,117 @@
 @import "tailwindcss";
 
 :root {
-  /* Force dark theme - black background, white text */
-  --background: #000000;
-  --foreground: #ffffff;
+  /* Fantasy guild palette (gold / amber on obsidian) */
+  --background: #0c0a08;
+  --foreground: #f6e7c6;
+  --muted: #1a130e;
+  --muted-foreground: #d5c7a0;
+  --card: rgba(28, 21, 16, 0.72);
+  --card-foreground: #f6e7c6;
+  --popover: rgba(28, 21, 16, 0.86);
+  --popover-foreground: #f6e7c6;
+  --primary: #d9a441;
+  --primary-foreground: #140f08;
+  --secondary: #a46b2f;
+  --secondary-foreground: #0f0a06;
+  --accent: #f1ce74;
+  --accent-foreground: #140e06;
+  --destructive: #e75d48;
+  --destructive-foreground: #0f0503;
+  --border: rgba(255, 215, 128, 0.14);
+  --input: rgba(255, 215, 128, 0.18);
+  --ring: #f3d580;
+  --shadow-color: rgba(0, 0, 0, 0.55);
+  --glow: rgba(249, 199, 92, 0.5);
+  --blur: 18px;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
+  min-height: 100vh;
+  background: radial-gradient(circle at 20% 20%, rgba(249, 199, 92, 0.12), transparent 35%),
+    radial-gradient(circle at 80% 0%, rgba(163, 109, 47, 0.18), transparent 38%),
+    linear-gradient(135deg, #0c0a08 0%, #0d0b09 100%);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), var(--font-cinzel), "Inter", system-ui, -apple-system, sans-serif;
 }
 
-/* Override Tailwind defaults for inputs and forms */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  pointer-events: none;
+  background: radial-gradient(circle at 30% 40%, rgba(255, 216, 128, 0.08), transparent 35%),
+    radial-gradient(circle at 70% 60%, rgba(255, 191, 94, 0.08), transparent 40%);
+  filter: blur(90px);
+  opacity: 0.7;
+  z-index: -1;
+}
+
+.glass-surface {
+  background: linear-gradient(135deg, rgba(255, 224, 158, 0.08), rgba(20, 14, 9, 0.82));
+  border: 1px solid var(--border);
+  backdrop-filter: blur(var(--blur)) saturate(1.3);
+  box-shadow: 0 20px 60px var(--shadow-color), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.golden-texture {
+  position: relative;
+}
+
+.golden-texture::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(120deg, transparent 0%, rgba(249, 199, 92, 0.08) 35%, transparent 70%);
+  opacity: 0.85;
+}
+
+.guild-heading {
+  font-family: var(--font-cinzel), var(--font-geist-sans), serif;
+  letter-spacing: 0.02em;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-cinzel), var(--font-geist-sans), serif;
+  letter-spacing: 0.01em;
+}
+
+/* Form controls */
 input[type="text"],
 input[type="email"],
 input[type="password"],
 input[type="tel"],
 textarea,
 select {
-  background-color: #1f2937; /* gray-800 */
-  color: #ffffff;
-  border-color: #374151; /* gray-700 */
+  background-color: rgba(18, 14, 11, 0.9);
+  color: var(--foreground);
+  border-color: var(--border);
+  backdrop-filter: blur(calc(var(--blur) / 2));
 }
 
 input[type="text"]:focus,
@@ -37,11 +120,47 @@ input[type="password"]:focus,
 input[type="tel"]:focus,
 textarea:focus,
 select:focus {
-  border-color: #3b82f6; /* blue-500 */
-  ring-color: #3b82f6;
+  border-color: var(--primary);
+  ring-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 1px var(--primary), 0 10px 40px var(--shadow-color);
 }
 
-/* Placeholder text */
 ::placeholder {
-  color: #9ca3af; /* gray-400 */
+  color: var(--muted-foreground);
+}
+
+/* Legacy gray class remap -> guild palette */
+.bg-black {
+  background-color: #0c0a08 !important;
+}
+
+.bg-gray-900 {
+  background-color: rgba(16, 12, 9, 0.92) !important;
+}
+
+.bg-gray-800 {
+  background-color: rgba(22, 17, 12, 0.88) !important;
+}
+
+.bg-gray-700 {
+  background-color: rgba(31, 24, 18, 0.82) !important;
+}
+
+.bg-gray-600 {
+  background-color: rgba(42, 32, 23, 0.8) !important;
+}
+
+.border-gray-900,
+.border-gray-800,
+.border-gray-700 {
+  border-color: rgba(243, 213, 128, 0.22) !important;
+}
+
+.text-gray-400 {
+  color: var(--muted-foreground) !important;
+}
+
+.text-white {
+  color: var(--foreground) !important;
 }
