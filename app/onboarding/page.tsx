@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
+import { User, Building2, Users, Sparkles, Shield } from 'lucide-react'
 
 type Step = 'profile' | 'company-choice' | 'create-company' | 'join-company'
 
@@ -359,63 +360,89 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white shadow rounded-lg p-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-6">Welcome! Let's get you set up</h1>
+    <div className="min-h-screen bg-gradient-to-br from-amber-900 via-slate-900 to-orange-950 py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 right-20 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 left-20 w-96 h-96 bg-orange-500/10 rounded-full blur-3xl"></div>
+        <Sparkles className="absolute top-40 left-40 h-6 w-6 text-amber-400/30" />
+        <Sparkles className="absolute bottom-40 right-40 h-4 w-4 text-orange-400/30" />
+      </div>
 
+      <div className="max-w-2xl mx-auto relative z-10">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <Shield className="h-12 w-12 text-amber-400" />
+          </div>
+          <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400 mb-2">
+            Establish Your Guild
+          </h1>
+          <p className="text-amber-200 text-lg">
+            Let's forge your legend together
+          </p>
+        </div>
+
+        <div className="bg-slate-800/50 backdrop-blur-md shadow-2xl rounded-xl border border-amber-500/30 p-8">
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
-              <p className="text-sm text-red-800">{error}</p>
+            <div className="mb-6 p-4 bg-red-900/50 border border-red-500/50 rounded-lg backdrop-blur-sm">
+              <p className="text-sm text-red-200">{error}</p>
             </div>
           )}
 
           {/* Profile Step */}
           {currentStep === 'profile' && (
             <form onSubmit={handleProfileSubmit} className="space-y-6">
-              <h2 className="text-xl font-semibold text-gray-900">Tell us about yourself</h2>
+              <div className="flex items-center gap-3 mb-6">
+                <User className="h-6 w-6 text-amber-400" />
+                <h2 className="text-2xl font-semibold text-white">Tell us about yourself</h2>
+              </div>
 
               <div className="grid grid-cols-1 gap-6">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">First Name *</label>
+                    <label className="block text-sm font-medium text-amber-200 mb-2">First Name *</label>
                     <input
                       type="text"
                       required
                       value={firstName}
                       onChange={(e) => setFirstName(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                      className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
+                      placeholder="Your first name"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Last Name *</label>
+                    <label className="block text-sm font-medium text-amber-200 mb-2">Last Name *</label>
                     <input
                       type="text"
                       required
                       value={lastName}
                       onChange={(e) => setLastName(e.target.value)}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                      className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
+                      placeholder="Your last name"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <label className="block text-sm font-medium text-amber-200 mb-2">Email</label>
                   <input
                     type="email"
                     value={profileData.email}
                     onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
+                    placeholder="your@email.com"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <label className="block text-sm font-medium text-amber-200 mb-2">Phone</label>
                   <input
                     type="tel"
                     value={profileData.phone}
                     onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
+                    placeholder="(555) 123-4567"
                   />
                 </div>
 
@@ -437,41 +464,42 @@ export default function OnboardingPage() {
                 />
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Address Line 2</label>
+                  <label className="block text-sm font-medium text-amber-200 mb-2">Address Line 2</label>
                   <input
                     type="text"
                     value={profileData.address_line_2}
                     onChange={(e) => setProfileData({ ...profileData, address_line_2: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
+                    placeholder="Apt, suite, etc."
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">City</label>
+                    <label className="block text-sm font-medium text-amber-200 mb-2">City</label>
                     <input
                       type="text"
                       value={profileData.city}
                       onChange={(e) => setProfileData({ ...profileData, city: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                      className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">State</label>
+                    <label className="block text-sm font-medium text-amber-200 mb-2">State</label>
                     <input
                       type="text"
                       value={profileData.state}
                       onChange={(e) => setProfileData({ ...profileData, state: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                      className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Zipcode</label>
+                    <label className="block text-sm font-medium text-amber-200 mb-2">Zipcode</label>
                     <input
                       type="text"
                       value={profileData.zipcode}
                       onChange={(e) => setProfileData({ ...profileData, zipcode: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                      className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
                     />
                   </div>
                 </div>
@@ -480,9 +508,9 @@ export default function OnboardingPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all shadow-lg shadow-amber-500/30"
               >
-                {loading ? 'Saving...' : 'Continue'}
+                {loading ? 'Saving...' : 'Continue Your Journey'}
               </button>
             </form>
           )}
@@ -490,25 +518,25 @@ export default function OnboardingPage() {
           {/* Company Choice Step */}
           {currentStep === 'company-choice' && (
             <div className="space-y-6">
-              <h2 className="text-xl font-semibold text-gray-900">What would you like to do?</h2>
+              <h2 className="text-2xl font-semibold text-white text-center mb-8">Choose Your Path</h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <button
                   onClick={() => handleCompanyChoice('create')}
-                  className="p-6 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  className="group p-8 border-2 border-amber-500/30 rounded-xl hover:border-amber-500 hover:bg-amber-500/10 transition-all backdrop-blur-sm"
                 >
-                  <div className="text-4xl mb-2">🏢</div>
-                  <h3 className="font-semibold text-lg mb-2">Create a Company</h3>
-                  <p className="text-sm text-gray-600">Start your own company and invite team members</p>
+                  <Building2 className="h-12 w-12 text-amber-400 mb-4 mx-auto" />
+                  <h3 className="font-bold text-xl mb-3 text-white">Forge a Guild</h3>
+                  <p className="text-sm text-amber-200">Establish your own guild and recruit champions to your cause</p>
                 </button>
 
                 <button
                   onClick={() => handleCompanyChoice('join')}
-                  className="p-6 border-2 border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
+                  className="group p-8 border-2 border-amber-500/30 rounded-xl hover:border-amber-500 hover:bg-amber-500/10 transition-all backdrop-blur-sm"
                 >
-                  <div className="text-4xl mb-2">👥</div>
-                  <h3 className="font-semibold text-lg mb-2">Join a Company</h3>
-                  <p className="text-sm text-gray-600">Use a company code to join an existing company</p>
+                  <Users className="h-12 w-12 text-amber-400 mb-4 mx-auto" />
+                  <h3 className="font-bold text-xl mb-3 text-white">Join a Guild</h3>
+                  <p className="text-sm text-amber-200">Use an ancient code to join an existing guild as a warrior</p>
                 </button>
               </div>
             </div>
@@ -517,21 +545,24 @@ export default function OnboardingPage() {
           {/* Create Company Step */}
           {currentStep === 'create-company' && (
             <form onSubmit={handleCreateCompany} className="space-y-6">
-              <h2 className="text-xl font-semibold text-gray-900">Create Your Company</h2>
+              <div className="flex items-center gap-3 mb-6">
+                <Building2 className="h-6 w-6 text-amber-400" />
+                <h2 className="text-2xl font-semibold text-white">Forge Your Guild</h2>
+              </div>
 
               {/* Checkbox to use profile data */}
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+              <div className="bg-amber-900/30 border border-amber-500/30 rounded-lg p-4 backdrop-blur-sm">
                 <label className="flex items-start cursor-pointer">
                   <input
                     type="checkbox"
                     checked={useProfileData}
                     onChange={(e) => handleUseProfileDataToggle(e.target.checked)}
-                    className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    className="mt-1 h-4 w-4 text-amber-600 focus:ring-amber-500 border-amber-300 rounded"
                   />
                   <div className="ml-3">
-                    <span className="text-sm font-medium text-gray-900">Use my profile information for company</span>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Perfect for mobile businesses or home-based companies. This will auto-fill your company contact details with your personal information.
+                    <span className="text-sm font-medium text-amber-100">Use my profile information for guild</span>
+                    <p className="text-xs text-amber-200/80 mt-1">
+                      Perfect for mobile guilds or home-based operations. Auto-fills your guild contact details.
                     </p>
                   </div>
                 </label>
@@ -539,48 +570,49 @@ export default function OnboardingPage() {
 
               <div className="grid grid-cols-1 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Company Name *</label>
+                  <label className="block text-sm font-medium text-amber-200 mb-2">Guild Name *</label>
                   <input
                     type="text"
                     required
                     value={companyData.name}
                     onChange={(e) => setCompanyData({ ...companyData, name: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
+                    placeholder="The Golden Dragon Company"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Company Phone</label>
+                  <label className="block text-sm font-medium text-amber-200 mb-2">Guild Phone</label>
                   <input
                     type="tel"
                     value={companyData.phone}
                     onChange={(e) => setCompanyData({ ...companyData, phone: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Company Email</label>
+                  <label className="block text-sm font-medium text-amber-200 mb-2">Guild Email</label>
                   <input
                     type="email"
                     value={companyData.email}
                     onChange={(e) => setCompanyData({ ...companyData, email: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Website</label>
+                  <label className="block text-sm font-medium text-amber-200 mb-2">Website</label>
                   <input
                     type="url"
                     value={companyData.website}
                     onChange={(e) => setCompanyData({ ...companyData, website: e.target.value })}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                    className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
                   />
                 </div>
 
                 <AddressAutocomplete
-                  label="Address"
+                  label="Guild Address"
                   value={companyData.address}
                   onChange={(value) => setCompanyData({ ...companyData, address: value })}
                   onPlaceSelected={(components) => {
@@ -593,35 +625,35 @@ export default function OnboardingPage() {
                       country: components.country,
                     })
                   }}
-                  placeholder="Start typing company address..."
+                  placeholder="Start typing guild address..."
                 />
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">City</label>
+                    <label className="block text-sm font-medium text-amber-200 mb-2">City</label>
                     <input
                       type="text"
                       value={companyData.city}
                       onChange={(e) => setCompanyData({ ...companyData, city: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                      className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">State</label>
+                    <label className="block text-sm font-medium text-amber-200 mb-2">State</label>
                     <input
                       type="text"
                       value={companyData.state}
                       onChange={(e) => setCompanyData({ ...companyData, state: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                      className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Zipcode</label>
+                    <label className="block text-sm font-medium text-amber-200 mb-2">Zipcode</label>
                     <input
                       type="text"
                       value={companyData.zipcode}
                       onChange={(e) => setCompanyData({ ...companyData, zipcode: e.target.value })}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border"
+                      className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 backdrop-blur-sm"
                     />
                   </div>
                 </div>
@@ -631,16 +663,16 @@ export default function OnboardingPage() {
                 <button
                   type="button"
                   onClick={() => setCurrentStep('company-choice')}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="flex-1 py-3 px-4 border-2 border-amber-500/30 rounded-lg shadow-sm text-sm font-medium text-amber-200 bg-slate-900/50 hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 backdrop-blur-sm transition-all"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="flex-1 py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all shadow-lg shadow-amber-500/30"
                 >
-                  {loading ? 'Creating...' : 'Create Company'}
+                  {loading ? 'Forging Guild...' : 'Forge Guild'}
                 </button>
               </div>
             </form>
@@ -649,11 +681,14 @@ export default function OnboardingPage() {
           {/* Join Company Step */}
           {currentStep === 'join-company' && (
             <form onSubmit={handleJoinCompany} className="space-y-6">
-              <h2 className="text-xl font-semibold text-gray-900">Join a Company</h2>
+              <div className="flex items-center gap-3 mb-6">
+                <Users className="h-6 w-6 text-amber-400" />
+                <h2 className="text-2xl font-semibold text-white">Join a Guild</h2>
+              </div>
 
               <div className="grid grid-cols-1 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Company Code (Optional)</label>
+                  <label className="block text-sm font-medium text-amber-200 mb-2">Guild Code (Optional)</label>
                   <input
                     type="text"
                     value={companyCode}
@@ -662,33 +697,33 @@ export default function OnboardingPage() {
                       setCompanyCode(code)
                       lookupCompany(code)
                     }}
-                    placeholder="Enter the code provided by your employer"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-3 py-2 border uppercase font-mono"
+                    placeholder="Enter the ancient code from your guild master"
+                    className="block w-full rounded-lg border border-amber-500/30 shadow-sm focus:border-amber-500 focus:ring-2 focus:ring-amber-500 px-4 py-3 bg-slate-900/50 text-white placeholder-amber-400/50 uppercase font-mono backdrop-blur-sm"
                   />
-                  <p className="mt-1 text-sm text-gray-500">
-                    Leave blank to skip this step and add company information later
+                  <p className="mt-2 text-sm text-amber-200/80">
+                    Leave blank to skip and join a guild later
                   </p>
 
                   {matchedCompanyName && (
-                    <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
-                      <p className="text-sm text-green-800">
-                        <strong>Company found:</strong> {matchedCompanyName}
+                    <div className="mt-3 p-4 bg-green-900/50 border border-green-500/50 rounded-lg backdrop-blur-sm">
+                      <p className="text-sm text-green-200">
+                        <strong>Guild found:</strong> {matchedCompanyName}
                       </p>
                     </div>
                   )}
 
                   {companyCode && !matchedCompanyName && companyCode.length >= 3 && (
-                    <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                      <p className="text-sm text-yellow-800">
-                        No company found with this code. Please check the code or leave blank to skip.
+                    <div className="mt-3 p-4 bg-yellow-900/50 border border-yellow-500/50 rounded-lg backdrop-blur-sm">
+                      <p className="text-sm text-yellow-200">
+                        No guild found with this code. Please verify or leave blank to skip.
                       </p>
                     </div>
                   )}
                 </div>
 
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-md">
-                  <p className="text-sm text-blue-800">
-                    <strong>Note:</strong> Your start date will automatically be set to today ({new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}). Job title and department can be assigned by your employer later.
+                <div className="p-4 bg-amber-900/30 border border-amber-500/30 rounded-lg backdrop-blur-sm">
+                  <p className="text-sm text-amber-100">
+                    <strong>Note:</strong> Your enlistment date will be set to today ({new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}). Your rank and division can be assigned by your guild master later.
                   </p>
                 </div>
               </div>
@@ -697,16 +732,16 @@ export default function OnboardingPage() {
                 <button
                   type="button"
                   onClick={() => setCurrentStep('company-choice')}
-                  className="flex-1 py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  className="flex-1 py-3 px-4 border-2 border-amber-500/30 rounded-lg shadow-sm text-sm font-medium text-amber-200 bg-slate-900/50 hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 backdrop-blur-sm transition-all"
                 >
                   Back
                 </button>
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                  className="flex-1 py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-bold text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-500 disabled:opacity-50 transition-all shadow-lg shadow-amber-500/30"
                 >
-                  {loading ? (companyCode ? 'Joining...' : 'Continuing...') : (companyCode ? 'Join Company' : 'Skip for Now')}
+                  {loading ? (companyCode ? 'Joining Guild...' : 'Continuing...') : (companyCode ? 'Join Guild' : 'Skip for Now')}
                 </button>
               </div>
             </form>

@@ -216,21 +216,21 @@ export default function JobsPage() {
   if (loadingData) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-lg text-gray-400">Loading jobs...</div>
+        <div className="text-lg text-muted-foreground">Loading jobs...</div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+      <div className="glass-surface shadow-lg rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold text-white">
+          <h2 className="text-lg font-semibold guild-heading">
             Job Board ({jobs.length} total)
           </h2>
           <button
             onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring"
           >
             {showForm ? 'Cancel' : '+ Create Job'}
           </button>
@@ -238,28 +238,28 @@ export default function JobsPage() {
 
         {/* Create Job Form */}
         {showForm && (
-          <form onSubmit={handleSubmit} className="mb-6 p-4 bg-gray-900 rounded-lg border border-gray-700">
-            <h3 className="text-md font-semibold text-white mb-4">New Job</h3>
+          <form onSubmit={handleSubmit} className="mb-6 p-4 glass-surface rounded-lg">
+            <h3 className="text-md font-semibold guild-heading mb-4">New Job</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Customer *
                 </label>
                 <input
                   type="text"
                   value={formData.customer_name}
                   disabled
-                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-gray-400 cursor-not-allowed"
+                  className="w-full px-3 py-2 glass-surface rounded-md text-muted-foreground cursor-not-allowed"
                   placeholder="Select customer from Customer List"
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Go to Customers tab and click "Create Job" to select a customer
                 </p>
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Job Title *
                 </label>
                 <input
@@ -269,12 +269,12 @@ export default function JobsPage() {
                   onChange={handleInputChange}
                   required
                   placeholder="e.g., Roof Repair, Lawn Maintenance"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Summary
                 </label>
                 <textarea
@@ -283,12 +283,12 @@ export default function JobsPage() {
                   onChange={handleInputChange}
                   rows={2}
                   placeholder="Brief description of the job"
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
 
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-300 mb-1">
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
                   Planned End Date
                 </label>
                 <input
@@ -296,7 +296,7 @@ export default function JobsPage() {
                   name="planned_end_date"
                   value={formData.planned_end_date}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
             </div>
@@ -306,7 +306,7 @@ export default function JobsPage() {
 
               <div className="grid grid-cols-1 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Street Address
                   </label>
                   <AddressAutocomplete
@@ -314,12 +314,12 @@ export default function JobsPage() {
                     onChange={(value) => setFormData(prev => ({ ...prev, service_address: value }))}
                     onPlaceSelected={handleAddressSelect}
                     placeholder="Start typing address..."
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-1">
+                  <label className="block text-sm font-medium text-muted-foreground mb-1">
                     Address Line 2
                   </label>
                   <input
@@ -328,39 +328,39 @@ export default function JobsPage() {
                     value={formData.service_address_line_2}
                     onChange={handleInputChange}
                     placeholder="Apt, Suite, Unit, etc."
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                   />
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">City</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">City</label>
                     <input
                       type="text"
                       name="service_city"
                       value={formData.service_city}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">State</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">State</label>
                     <input
                       type="text"
                       name="service_state"
                       value={formData.service_state}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-1">Zip</label>
+                    <label className="block text-sm font-medium text-muted-foreground mb-1">Zip</label>
                     <input
                       type="text"
                       name="service_zipcode"
                       value={formData.service_zipcode}
                       onChange={handleInputChange}
-                      className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                     />
                   </div>
                 </div>
@@ -385,14 +385,14 @@ export default function JobsPage() {
               <button
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600 focus:outline-none"
+                className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted focus:outline-none"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submitting || !formData.customer_id}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
               >
                 {submitting ? 'Creating...' : 'Create Job'}
               </button>
@@ -403,9 +403,9 @@ export default function JobsPage() {
         {/* Job Board - 3 Columns */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Upcoming Column (Red) */}
-          <div className="bg-gray-900 rounded-lg border-2 border-red-600 overflow-hidden">
-            <div className="bg-red-600 px-4 py-3">
-              <h3 className="text-white font-semibold flex items-center">
+          <div className="glass-surface rounded-lg border-2 border-destructive overflow-hidden">
+            <div className="bg-destructive px-4 py-3">
+              <h3 className="text-destructive-foreground font-semibold flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                 </svg>
@@ -414,21 +414,21 @@ export default function JobsPage() {
             </div>
             <div className="p-3 space-y-3 max-h-[600px] overflow-y-auto">
               {upcomingJobs.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-4">No upcoming jobs</p>
+                <p className="text-muted-foreground text-sm text-center py-4">No upcoming jobs</p>
               ) : (
                 upcomingJobs.map((job) => (
-                  <div key={job.id} className="bg-gray-800 p-3 rounded border border-gray-700 hover:border-red-500 transition-colors">
-                    <h4 className="text-white font-medium text-sm mb-1">{job.title}</h4>
-                    <p className="text-gray-400 text-xs mb-2">
+                  <div key={job.id} className="glass-surface p-3 rounded hover:border-destructive transition-colors">
+                    <h4 className="text-foreground font-medium text-sm mb-1">{job.title}</h4>
+                    <p className="text-muted-foreground text-xs mb-2">
                       Customer: {job.customer?.name || 'Unknown'}
                     </p>
                     {job.planned_end_date && (
-                      <p className="text-gray-500 text-xs">
+                      <p className="text-muted-foreground text-xs">
                         Due: {new Date(job.planned_end_date).toLocaleDateString()}
                       </p>
                     )}
                     {job.service_city && (
-                      <p className="text-gray-500 text-xs">
+                      <p className="text-muted-foreground text-xs">
                         {job.service_city}, {job.service_state}
                       </p>
                     )}
@@ -439,9 +439,9 @@ export default function JobsPage() {
           </div>
 
           {/* In Progress Column (Yellow) */}
-          <div className="bg-gray-900 rounded-lg border-2 border-yellow-500 overflow-hidden">
-            <div className="bg-yellow-500 px-4 py-3">
-              <h3 className="text-white font-semibold flex items-center">
+          <div className="glass-surface rounded-lg border-2 border-accent overflow-hidden">
+            <div className="bg-accent px-4 py-3">
+              <h3 className="text-accent-foreground font-semibold flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
                 </svg>
@@ -450,21 +450,21 @@ export default function JobsPage() {
             </div>
             <div className="p-3 space-y-3 max-h-[600px] overflow-y-auto">
               {inProgressJobs.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-4">No jobs in progress</p>
+                <p className="text-muted-foreground text-sm text-center py-4">No jobs in progress</p>
               ) : (
                 inProgressJobs.map((job) => (
-                  <div key={job.id} className="bg-gray-800 p-3 rounded border border-gray-700 hover:border-yellow-500 transition-colors">
-                    <h4 className="text-white font-medium text-sm mb-1">{job.title}</h4>
-                    <p className="text-gray-400 text-xs mb-2">
+                  <div key={job.id} className="glass-surface p-3 rounded hover:border-accent transition-colors">
+                    <h4 className="text-foreground font-medium text-sm mb-1">{job.title}</h4>
+                    <p className="text-muted-foreground text-xs mb-2">
                       Customer: {job.customer?.name || 'Unknown'}
                     </p>
                     {job.planned_end_date && (
-                      <p className="text-gray-500 text-xs">
+                      <p className="text-muted-foreground text-xs">
                         Due: {new Date(job.planned_end_date).toLocaleDateString()}
                       </p>
                     )}
                     {job.service_city && (
-                      <p className="text-gray-500 text-xs">
+                      <p className="text-muted-foreground text-xs">
                         {job.service_city}, {job.service_state}
                       </p>
                     )}
@@ -475,9 +475,9 @@ export default function JobsPage() {
           </div>
 
           {/* Done Column (Green) */}
-          <div className="bg-gray-900 rounded-lg border-2 border-green-600 overflow-hidden">
-            <div className="bg-green-600 px-4 py-3">
-              <h3 className="text-white font-semibold flex items-center">
+          <div className="glass-surface rounded-lg border-2 border-secondary overflow-hidden">
+            <div className="bg-secondary px-4 py-3">
+              <h3 className="text-secondary-foreground font-semibold flex items-center">
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
@@ -486,21 +486,21 @@ export default function JobsPage() {
             </div>
             <div className="p-3 space-y-3 max-h-[600px] overflow-y-auto">
               {doneJobs.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-4">No completed jobs</p>
+                <p className="text-muted-foreground text-sm text-center py-4">No completed jobs</p>
               ) : (
                 doneJobs.map((job) => (
-                  <div key={job.id} className="bg-gray-800 p-3 rounded border border-gray-700 hover:border-green-600 transition-colors">
-                    <h4 className="text-white font-medium text-sm mb-1">{job.title}</h4>
-                    <p className="text-gray-400 text-xs mb-2">
+                  <div key={job.id} className="glass-surface p-3 rounded hover:border-secondary transition-colors">
+                    <h4 className="text-foreground font-medium text-sm mb-1">{job.title}</h4>
+                    <p className="text-muted-foreground text-xs mb-2">
                       Customer: {job.customer?.name || 'Unknown'}
                     </p>
                     {job.planned_end_date && (
-                      <p className="text-gray-500 text-xs">
+                      <p className="text-muted-foreground text-xs">
                         Completed: {new Date(job.planned_end_date).toLocaleDateString()}
                       </p>
                     )}
                     {job.service_city && (
-                      <p className="text-gray-500 text-xs">
+                      <p className="text-muted-foreground text-xs">
                         {job.service_city}, {job.service_state}
                       </p>
                     )}

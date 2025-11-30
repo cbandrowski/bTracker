@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { OwnerSidebar } from '@/components/dashboard/OwnerSidebar'
+import { Crown, LogOut } from 'lucide-react'
 
 export default function OwnerLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth()
@@ -57,8 +58,8 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
 
   if (loading || isOwner === null) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <div className="text-xl text-white">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-violet-950 flex items-center justify-center">
+        <div className="text-xl text-purple-200">Loading Guild Hall...</div>
       </div>
     )
   }
@@ -78,7 +79,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: `Team (${employeeCount})`,
+      label: `Warriors (${employeeCount})`,
       link: '/dashboard/owner/team',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -87,7 +88,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: 'Customers',
+      label: 'Clients',
       link: '/dashboard/owner/customers',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -96,7 +97,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: 'Billing',
+      label: 'Treasury',
       link: '/dashboard/owner/billing',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -105,7 +106,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: 'Jobs',
+      label: 'Quests',
       link: '/dashboard/owner/jobs',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -114,7 +115,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: 'Assignments',
+      label: 'Quest Assignments',
       link: '/dashboard/owner/assignments',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -123,7 +124,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: 'Job Board',
+      label: 'Quest Board',
       link: '/dashboard/owner/job-board',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -141,7 +142,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: 'Schedule & Time',
+      label: 'Time Ledger',
       link: '/dashboard/owner/schedule-and-time/schedule',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -168,7 +169,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: 'Vendor Contacts',
+      label: 'Merchant Contacts',
       link: '/dashboard/owner/vendor-contacts',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -179,14 +180,25 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
   ]
 
   return (
-    <div className="min-h-screen bg-black py-8 print:py-0 print:bg-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 print:px-0 print:max-w-none">
+    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-violet-950 py-8 print:py-0 print:bg-white relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none print:hidden">
+        <div className="absolute top-20 left-20 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 right-20 w-96 h-96 bg-violet-500/10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 print:px-0 print:max-w-none relative z-10">
         {/* Header */}
-        <div className="bg-gray-900 shadow-lg rounded-lg mb-6 border border-gray-800 print:hidden">
-          <div className="px-4 py-5 sm:px-6 flex justify-between items-center border-b border-gray-800">
+        <div className="bg-slate-800/50 backdrop-blur-md shadow-2xl rounded-xl border border-purple-500/30 mb-6 print:hidden">
+          <div className="px-6 py-5 flex justify-between items-center">
             <div>
-              <h1 className="text-2xl font-bold text-white">Owner Dashboard</h1>
-              <p className="mt-1 text-sm text-gray-400">
+              <div className="flex items-center gap-3 mb-1">
+                <Crown className="h-8 w-8 text-amber-400" />
+                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-400">
+                  Guild Master Hall
+                </h1>
+              </div>
+              <p className="mt-1 text-sm text-purple-200">
                 Welcome back, {profile?.full_name || user?.email}!
               </p>
             </div>
@@ -195,8 +207,9 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
                 await supabase.auth.signOut()
                 router.push('/login')
               }}
-              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500"
+              className="flex items-center gap-2 px-5 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all shadow-lg"
             >
+              <LogOut className="h-4 w-4" />
               Sign Out
             </button>
           </div>
@@ -209,7 +222,7 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
           </div>
 
           {/* Main Content */}
-          <main className="flex-1 bg-gray-900 rounded-lg border border-gray-800 overflow-hidden print:border-0 print:rounded-none print:bg-white print:overflow-visible">
+          <main className="flex-1 bg-slate-800/50 backdrop-blur-md rounded-xl border border-purple-500/30 overflow-hidden shadow-2xl print:border-0 print:rounded-none print:bg-white print:overflow-visible">
             <div className="p-6 print:p-0">
               {children}
             </div>
