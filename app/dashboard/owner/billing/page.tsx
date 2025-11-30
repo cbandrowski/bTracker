@@ -53,8 +53,8 @@ export default function BillingPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Billing Overview</h1>
-          <p className="text-sm text-gray-400 mt-1">
+          <h1 className="text-2xl font-bold guild-heading">Billing Overview</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Manage invoices, payments, and customer balances
           </p>
         </div>
@@ -83,13 +83,13 @@ export default function BillingPage() {
       <BillingStatsCards stats={billingStats.data} loading={billingStats.loading} />
 
       {/* Unbilled Jobs Table */}
-      <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+      <div className="rounded-lg border-border p-6 glass-surface">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-lg font-semibold guild-heading">
               Unbilled Jobs
             </h2>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Completed jobs ready to be invoiced. Click a row to create an invoice.
             </p>
           </div>
@@ -107,9 +107,9 @@ export default function BillingPage() {
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Invoices */}
-        <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+        <div className="rounded-lg border-border p-6 glass-surface">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-lg font-semibold guild-heading">
               Recent Invoices
             </h2>
             <Button
@@ -127,9 +127,9 @@ export default function BillingPage() {
         </div>
 
         {/* Customers with Outstanding Balance */}
-        <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+        <div className="rounded-lg border-border p-6 glass-surface">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            <h2 className="text-lg font-semibold guild-heading">
               Outstanding Balances
             </h2>
             <Button
@@ -148,7 +148,7 @@ export default function BillingPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+      <div className="rounded-lg border-border p-6 glass-surface">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
           Quick Actions
         </h2>

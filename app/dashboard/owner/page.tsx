@@ -339,8 +339,8 @@ export default function OwnerDashboardPage() {
   return (
     <div className="space-y-6">
       {/* User Profile Info */}
-      <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
-        <h2 className="text-lg font-semibold text-white mb-4">Your Profile</h2>
+      <div className="glass-surface shadow-lg rounded-lg p-6">
+        <h2 className="text-lg font-semibold guild-heading mb-4">Your Profile</h2>
 
         {user.user_metadata?.avatar_url && (
           <div className="mb-4 flex justify-center">
@@ -409,9 +409,9 @@ export default function OwnerDashboardPage() {
 
       {/* Company Logo */}
       {companies.length > 0 && (
-        <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+        <div className="glass-surface shadow-lg rounded-lg p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <h2 className="text-lg font-semibold guild-heading flex items-center gap-2">
               <Building2 className="h-5 w-5" />
               Company Logo
             </h2>
@@ -497,9 +497,9 @@ export default function OwnerDashboardPage() {
       {companies.length > 0 ? (
         <>
           {companies.map((company) => (
-            <div key={company.id} className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+            <div key={company.id} className="glass-surface shadow-lg rounded-lg p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <h2 className="text-lg font-semibold guild-heading flex items-center gap-2">
                   <Building2 className="h-5 w-5" />
                   Company Information
                 </h2>
@@ -710,9 +710,9 @@ export default function OwnerDashboardPage() {
           ))}
 
           {/* Accountant Information - Always Visible and Separate */}
-          <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+          <div className="glass-surface shadow-lg rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+              <h2 className="text-lg font-semibold guild-heading flex items-center gap-2">
                 <User className="h-5 w-5" />
                 Accountant Information (Optional)
               </h2>
@@ -944,9 +944,9 @@ export default function OwnerDashboardPage() {
           )}
         </>
       ) : (
-        <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
-          <p className="text-gray-400">No company information available</p>
-          <p className="text-gray-500 text-sm mt-2">
+        <div className="glass-surface shadow-lg rounded-lg p-6">
+          <p className="text-muted-foreground">No company information available</p>
+          <p className="text-muted-foreground text-sm mt-2">
             It looks like you haven't created a company yet.
           </p>
           <button

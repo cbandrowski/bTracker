@@ -311,7 +311,7 @@ export default function SchedulePage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-white">Loading schedule...</div>
+        <div className="text-foreground">Loading schedule...</div>
       </div>
     )
   }
@@ -319,9 +319,9 @@ export default function SchedulePage() {
   return (
     <div className="space-y-6">
       {/* Header with filters */}
-      <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+      <div className="bg-slate-900/50 backdrop-blur-sm shadow-xl rounded-xl p-6 border border-purple-500/20">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <h2 className="text-2xl font-semibold text-white">Schedule</h2>
+          <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-400">Quest Schedule</h2>
 
           {/* Filters */}
           <div className="flex flex-wrap gap-4">
@@ -329,9 +329,9 @@ export default function SchedulePage() {
             <select
               value={employeeFilter}
               onChange={(e) => setEmployeeFilter(e.target.value)}
-              className="px-4 py-2 bg-gray-700 text-white rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 bg-slate-800/50 text-purple-200 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
             >
-              <option value="all">All Employees</option>
+              <option value="all">All Warriors</option>
               {employees.map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.full_name}</option>
               ))}
@@ -341,7 +341,7 @@ export default function SchedulePage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="px-4 py-2 bg-gray-700 text-white rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="px-4 py-2 bg-slate-800/50 text-purple-200 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
             >
               <option value="all">All Statuses</option>
               <option value="upcoming">Upcoming Only</option>
@@ -350,33 +350,33 @@ export default function SchedulePage() {
             </select>
 
             {/* View Mode Toggle */}
-            <div className="flex bg-gray-700 rounded-md border border-gray-600">
+            <div className="flex bg-slate-800/50 border border-purple-500/30 rounded-lg overflow-hidden backdrop-blur-sm">
               <button
                 onClick={() => setViewMode('day')}
-                className={`px-4 py-2 rounded-l-md ${
+                className={`px-4 py-2 font-medium transition-all ${
                   viewMode === 'day'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-300 hover:bg-gray-600'
+                    ? 'bg-gradient-to-r from-amber-600 to-purple-600 text-white shadow-lg'
+                    : 'text-purple-200 hover:bg-purple-500/10'
                 }`}
               >
                 Day
               </button>
               <button
                 onClick={() => setViewMode('week')}
-                className={`px-4 py-2 ${
+                className={`px-4 py-2 font-medium transition-all border-x border-purple-500/30 ${
                   viewMode === 'week'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-300 hover:bg-gray-600'
+                    ? 'bg-gradient-to-r from-amber-600 to-purple-600 text-white shadow-lg'
+                    : 'text-purple-200 hover:bg-purple-500/10'
                 }`}
               >
                 Week
               </button>
               <button
                 onClick={() => setViewMode('month')}
-                className={`px-4 py-2 rounded-r-md ${
+                className={`px-4 py-2 font-medium transition-all ${
                   viewMode === 'month'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-300 hover:bg-gray-600'
+                    ? 'bg-gradient-to-r from-amber-600 to-purple-600 text-white shadow-lg'
+                    : 'text-purple-200 hover:bg-purple-500/10'
                 }`}
               >
                 Month
@@ -391,13 +391,13 @@ export default function SchedulePage() {
         <div className="flex items-center justify-between">
           <button
             onClick={goToPrevious}
-            className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+            className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
           >
             ← Previous
           </button>
 
           <div className="text-center">
-            <h3 className="text-xl font-semibold text-white">
+            <h3 className="text-xl font-semibold guild-heading">
               {currentDate.toLocaleDateString('en-US', {
                 month: 'long',
                 year: 'numeric',
@@ -407,7 +407,7 @@ export default function SchedulePage() {
             </h3>
             <button
               onClick={goToToday}
-              className="text-sm text-blue-400 hover:text-blue-300 mt-1"
+              className="text-sm text-primary hover:text-primary/80 mt-1"
             >
               Today
             </button>
@@ -415,7 +415,7 @@ export default function SchedulePage() {
 
           <button
             onClick={goToNext}
-            className="px-4 py-2 bg-gray-700 text-white rounded-md hover:bg-gray-600"
+            className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
           >
             Next →
           </button>
@@ -423,10 +423,10 @@ export default function SchedulePage() {
       </div>
 
       {viewMode === 'day' ? (
-        <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+        <div className="glass-surface shadow-lg rounded-lg p-6">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-white">Daily Schedule</h3>
-            <span className="text-sm text-gray-400">
+            <h3 className="text-lg font-semibold guild-heading">Daily Schedule</h3>
+            <span className="text-sm text-muted-foreground">
               {currentDate.toLocaleDateString('en-US', {
                 weekday: 'long',
                 month: 'long',
@@ -436,7 +436,7 @@ export default function SchedulePage() {
             </span>
           </div>
           <div className="mt-6 grid grid-cols-[70px_1fr] gap-4">
-            <div className="text-right text-xs text-gray-500">
+            <div className="text-right text-xs text-muted-foreground">
               {Array.from({ length: HOURS_IN_DAY }).map((_, hour) => (
                 <div key={hour} className="h-16 relative">
                   <span className="absolute top-1/2 right-2 -translate-y-1/2">
@@ -446,18 +446,18 @@ export default function SchedulePage() {
               ))}
             </div>
             <div
-              className="relative border-l border-gray-700 rounded-lg bg-gray-900/30 overflow-hidden"
+              className="relative border-l border-border rounded-lg glass-surface overflow-hidden"
               style={{ height: `${timelineHeight}px` }}
               onClick={() => setSelectedAssignment(null)}
             >
               <div className="absolute inset-0 pointer-events-none">
                 {Array.from({ length: HOURS_IN_DAY }).map((_, hour) => (
-                  <div key={hour} className="h-16 border-b border-gray-800/70"></div>
+                  <div key={hour} className="h-16 border-b border-border/50"></div>
                 ))}
               </div>
               <div className="relative h-full">
                 {dayAssignments.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-sm">
+                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
                     No assignments scheduled
                   </div>
                 )}
@@ -473,27 +473,27 @@ export default function SchedulePage() {
                   return (
                     <div
                       key={assignment.id}
-                      className={`absolute left-4 right-4 p-3 rounded-lg border shadow-sm cursor-pointer transition-all hover:ring-2 hover:ring-blue-400 ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-blue-500' : ''}`}
+                      className={`absolute left-4 right-4 p-3 rounded-lg border shadow-sm cursor-pointer transition-all hover:ring-2 hover:ring-primary ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-primary' : ''}`}
                       style={{ top: `${top}px`, height: `${height}px` }}
                       onClick={(event) => {
                         event.stopPropagation()
                         setSelectedAssignment(assignment)
                       }}
                     >
-                      <div className="text-xs font-semibold uppercase tracking-wide text-gray-300">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         {assignment.employee?.profile?.full_name || 'Unassigned'}
                       </div>
-                      <div className="text-lg font-bold text-white truncate">
+                      <div className="text-lg font-bold text-foreground truncate">
                         {assignment.job?.title || 'Untitled Job'}
                       </div>
                       <div className="text-xs text-gray-300 mt-1">
                         {assignment.job?.customer?.name || 'No customer'}
                       </div>
-                      <div className="text-xs text-gray-300">
+                      <div className="text-xs text-muted-foreground">
                         {formatTimeRange(assignment.service_start_at, assignment.service_end_at)}
                       </div>
                       <div className="mt-2">
-                        <span className="text-xs px-2 py-0.5 rounded bg-gray-900/60 border border-gray-700">
+                        <span className="text-xs px-2 py-0.5 rounded glass-surface border border-border">
                           {getStatusBadge(assignment.assignment_status)}
                         </span>
                       </div>
@@ -505,11 +505,11 @@ export default function SchedulePage() {
           </div>
         </div>
       ) : (
-        <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+        <div className="glass-surface shadow-lg rounded-lg p-6">
           {/* Day headers */}
           <div className="grid grid-cols-7 gap-2 mb-4">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center font-semibold text-gray-400 py-2">
+              <div key={day} className="text-center font-semibold text-muted-foreground py-2">
                 {day}
               </div>
             ))}
@@ -527,8 +527,8 @@ export default function SchedulePage() {
                   key={index}
                   className={`min-h-32 p-2 rounded-lg border cursor-pointer ${
                     isTodayDate
-                      ? 'bg-blue-900/20 border-blue-500'
-                      : 'bg-gray-900 border-gray-700'
+                      ? 'glass-surface border-primary'
+                      : 'glass-surface border-border'
                   } ${
                     viewMode === 'month' && !isCurrentMonthDate
                       ? 'opacity-40'
@@ -540,7 +540,7 @@ export default function SchedulePage() {
                   }}
                 >
                   <div className={`text-sm font-semibold mb-2 ${
-                    isTodayDate ? 'text-blue-400' : 'text-gray-400'
+                    isTodayDate ? 'text-primary' : 'text-muted-foreground'
                   }`}>
                     {day.getDate()}
                   </div>
@@ -550,7 +550,7 @@ export default function SchedulePage() {
                     {dayAssignments.slice(0, viewMode === 'week' ? 10 : 3).map(assignment => (
                       <div
                         key={assignment.id}
-                        className={`relative text-xs p-2 rounded border cursor-pointer transition-all hover:ring-2 hover:ring-blue-400 ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-blue-500' : ''}`}
+                        className={`relative text-xs p-2 rounded border cursor-pointer transition-all hover:ring-2 hover:ring-primary ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-primary' : ''}`}
                         onClick={(event) => {
                           event.stopPropagation()
                           handleDaySelection(day)
@@ -563,16 +563,16 @@ export default function SchedulePage() {
                         <div className="truncate">{assignment.job?.title || 'Untitled Job'}</div>
                         {viewMode === 'week' && (
                           <>
-                            <div className="truncate text-gray-400">
+                            <div className="truncate text-muted-foreground">
                               {assignment.employee?.profile?.full_name || 'Unknown'}
                             </div>
-                            <div className="truncate text-gray-400">
+                            <div className="truncate text-muted-foreground">
                               {assignment.job?.customer?.name || 'No customer'}
                             </div>
                           </>
                         )}
                         {/* Click indicator */}
-                        <div className="absolute bottom-1 right-1 text-gray-500 hover:text-gray-300">
+                        <div className="absolute bottom-1 right-1 text-muted-foreground hover:text-foreground">
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a 1 1 0 001 1h1a 1 1 0 100-2v-3a 1 1 0 00-1-1H9z" clipRule="evenodd" />
                           </svg>
@@ -580,7 +580,7 @@ export default function SchedulePage() {
                       </div>
                     ))}
                     {dayAssignments.length > (viewMode === 'week' ? 10 : 3) && (
-                      <div className="text-xs text-gray-500 pl-2">
+                      <div className="text-xs text-muted-foreground pl-2">
                         +{dayAssignments.length - (viewMode === 'week' ? 10 : 3)} more
                       </div>
                     )}
@@ -595,10 +595,10 @@ export default function SchedulePage() {
       {selectedAssignment && (
         <div className="bg-gray-800 shadow-lg rounded-lg border border-gray-700 overflow-hidden">
           <div className="bg-gray-900 px-6 py-4 flex items-center justify-between border-b border-gray-700">
-            <h3 className="text-xl font-semibold text-white">Assignment Details</h3>
+            <h3 className="text-xl font-semibold guild-heading">Assignment Details</h3>
             <button
               onClick={() => setSelectedAssignment(null)}
-              className="text-gray-400 hover:text-white"
+              className="text-muted-foreground hover:text-foreground"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -611,7 +611,7 @@ export default function SchedulePage() {
             <div>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h4 className="text-2xl font-bold text-white mb-2">
+                  <h4 className="text-2xl font-bold text-foreground mb-2">
                     {selectedAssignment.job?.title || 'Untitled Job'}
                   </h4>
                   <div className="flex items-center gap-2">
@@ -621,7 +621,7 @@ export default function SchedulePage() {
                        selectedAssignment.assignment_status === 'done' ? 'Completed' : 'Cancelled'}
                     </span>
                     {selectedAssignment.job?.status && (
-                      <span className="px-3 py-1 rounded-full text-sm bg-gray-700 text-gray-300">
+                      <span className="px-3 py-1 rounded-full text-sm glass-surface text-muted-foreground">
                         Job: {selectedAssignment.job.status}
                       </span>
                     )}
@@ -632,7 +632,7 @@ export default function SchedulePage() {
               {selectedAssignment.job?.summary && (
                 <div className="bg-gray-900 rounded-lg p-4 mb-4">
                   <div className="text-sm font-semibold text-gray-400 mb-2">Summary</div>
-                  <p className="text-white">{selectedAssignment.job.summary}</p>
+                  <p className="text-foreground">{selectedAssignment.job.summary}</p>
                 </div>
               )}
             </div>
@@ -741,19 +741,19 @@ export default function SchedulePage() {
         <div className="flex flex-wrap gap-4 text-sm">
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-yellow-900/30 border border-yellow-600"></div>
-            <span className="text-gray-300">Upcoming (Assigned)</span>
+            <span className="text-muted-foreground">Upcoming (Assigned)</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-blue-900/30 border border-blue-600"></div>
-            <span className="text-gray-300">In Progress</span>
+            <span className="text-muted-foreground">In Progress</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-green-900/30 border border-green-600"></div>
-            <span className="text-gray-300">Completed</span>
+            <span className="text-muted-foreground">Completed</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded bg-gray-900/30 border border-gray-600"></div>
-            <span className="text-gray-300">Cancelled</span>
+            <span className="text-muted-foreground">Cancelled</span>
           </div>
         </div>
       </div>
