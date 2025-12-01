@@ -147,46 +147,6 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="rounded-lg border-border p-6 glass-surface">
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-          Quick Actions
-        </h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center"
-            onClick={() => router.push('/dashboard/owner/billing/customers')}
-          >
-            <Plus className="h-6 w-6 mb-2" />
-            <span>Create Invoice</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center"
-            onClick={() => router.push('/dashboard/owner/billing/customers')}
-          >
-            <Plus className="h-6 w-6 mb-2" />
-            <span>Record Payment</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center"
-            onClick={() => router.push('/dashboard/owner/billing/customers')}
-          >
-            <RefreshCw className="h-6 w-6 mb-2" />
-            <span>View All Customers</span>
-          </Button>
-          <Button
-            variant="outline"
-            className="h-auto py-4 flex flex-col items-center"
-            onClick={() => router.push('/dashboard/owner/billing/customers')}
-          >
-            <RefreshCw className="h-6 w-6 mb-2" />
-            <span>Manage Billing</span>
-          </Button>
-        </div>
-      </div>
     </div>
   )
 }

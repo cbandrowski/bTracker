@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { MoreHorizontal, Eye, CreditCard, FileText, Plus, Edit, Briefcase, Repeat } from 'lucide-react'
+import { MoreHorizontal, Eye, CreditCard, FileText, Plus, Edit, Briefcase, Repeat, FilePlus2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -33,6 +33,17 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
   const router = useRouter()
   const [sortColumn, setSortColumn] = useState<keyof CustomerWithBilling | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+
+  const handleCreateJob = (customer: CustomerWithBilling) => {
+    const currentPath = `${window.location.pathname}${window.location.search}`
+    sessionStorage.setItem('createJobReturnPath', currentPath)
+    sessionStorage.setItem('createJobForCustomer', JSON.stringify(customer))
+    router.push('/dashboard/owner/jobs?create=true')
+  }
+
+  const handleManualInvoice = (customer: CustomerWithBilling) => {
+    router.push(`/dashboard/owner/billing/customers/${customer.id}/manual`)
+  }
 
   const handleSort = (column: keyof CustomerWithBilling) => {
     const newDirection =
@@ -94,12 +105,12 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
   }
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-md border overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow>
             <TableHead
-              className="cursor-pointer select-none"
+              className="cursor-pointer select-none whitespace-nowrap"
               onClick={() => handleSort('name')}
               role="button"
               aria-sort={
@@ -111,16 +122,15 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
               }
             >
               <div className="flex items-center">
-                Name
+                Client
                 {sortColumn === 'name' && (
                   <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
                 )}
               </div>
             </TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead>Location</TableHead>
+            <TableHead className="whitespace-nowrap">Location</TableHead>
             <TableHead
-              className="cursor-pointer select-none text-right"
+              className="cursor-pointer select-none text-right whitespace-nowrap"
               onClick={() => handleSort('billedBalance')}
               role="button"
               aria-sort={
@@ -139,7 +149,7 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
               </div>
             </TableHead>
             <TableHead
-              className="cursor-pointer select-none text-right"
+              className="cursor-pointer select-none text-right whitespace-nowrap"
               onClick={() => handleSort('unappliedCredit')}
               role="button"
               aria-sort={
@@ -157,20 +167,20 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
                 )}
               </div>
             </TableHead>
-            <TableHead className="text-center">Open Invoices</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            <TableHead className="text-center whitespace-nowrap">Open Invoices</TableHead>
+            <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {sortedCustomers.map((customer) => (
             <TableRow key={customer.id} className="group">
-              <TableCell className="font-medium">{customer.name}</TableCell>
-              <TableCell>
-                <div className="flex flex-col text-sm">
-                  <span className="text-gray-900 dark:text-gray-100">
+              <TableCell className="align-top">
+                <div className="flex flex-col">
+                  <span className="font-medium text-foreground">{customer.name}</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
                     {customer.email || '-'}
                   </span>
-                  <span className="text-gray-500 dark:text-gray-400">
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
                     {formatPhoneNumber(customer.phone)}
                   </span>
                 </div>
@@ -250,13 +260,16 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
                       Edit Customer
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => {
-                        sessionStorage.setItem('createJobForCustomer', JSON.stringify(customer))
-                        router.push('/dashboard/owner/jobs?create=true')
-                      }}
+                      onClick={() => handleCreateJob(customer)}
                     >
                       <Briefcase className="mr-2 h-4 w-4" />
                       Create Job
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleManualInvoice(customer)}
+                    >
+                      <FilePlus2 className="mr-2 h-4 w-4" />
+                      Manual Invoice
                     </DropdownMenuItem>
                     {onCreateRecurringJob && (
                       <DropdownMenuItem

@@ -75,34 +75,34 @@ export default function TimeEntriesPage() {
     fetchEmployees()
   }, [])
 
+  const fetchTimeEntries = async () => {
+    setIsLoading(true)
+    try {
+      const params = new URLSearchParams({
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        status: statusFilter,
+        exclude_payroll: 'true', // Only show entries not yet in payroll,
+      })
+
+      if (selectedEmployeeId) {
+        params.append('employee_id', selectedEmployeeId)
+      }
+
+      const res = await fetch(`/api/time-entries?${params}`)
+      if (res.ok) {
+        const data = await res.json()
+        setTimeEntries(data.time_entries || [])
+      }
+    } catch (error) {
+      console.error('Error fetching time entries:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Fetch time entries
   useEffect(() => {
-    const fetchTimeEntries = async () => {
-      setIsLoading(true)
-      try {
-        const params = new URLSearchParams({
-          start_date: startDate.toISOString(),
-          end_date: endDate.toISOString(),
-          status: statusFilter,
-          exclude_payroll: 'true', // Only show entries not yet in payroll
-        })
-
-        if (selectedEmployeeId) {
-          params.append('employee_id', selectedEmployeeId)
-        }
-
-        const res = await fetch(`/api/time-entries?${params}`)
-        if (res.ok) {
-          const data = await res.json()
-          setTimeEntries(data.time_entries || [])
-        }
-      } catch (error) {
-        console.error('Error fetching time entries:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     fetchTimeEntries()
   }, [startDate, endDate, selectedEmployeeId, statusFilter])
 
@@ -245,7 +245,7 @@ export default function TimeEntriesPage() {
       )}
 
       {/* Time Entries Table */}
-      {!isLoading && <TimeEntriesTable timeEntries={timeEntries} onExportCSV={handleExportCSV} />}
+      {!isLoading && <TimeEntriesTable timeEntries={timeEntries} onExportCSV={handleExportCSV} onRefresh={fetchTimeEntries} />}
     </div>
   )
 }

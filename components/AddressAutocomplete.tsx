@@ -45,9 +45,13 @@ export default function AddressAutocomplete({
     })
 
     // Listen for place selection
-    autocompleteRef.current.addListener('place_changed', () => {
+    const listener = autocompleteRef.current.addListener('place_changed', () => {
       const place = autocompleteRef.current?.getPlace()
+
+      console.log('Place selected:', place)
+
       if (!place || !place.address_components) {
+        console.warn('No address components found')
         return
       }
 
@@ -89,20 +93,23 @@ export default function AddressAutocomplete({
       // Combine street number and route for full address
       components.address = `${streetNumber} ${route}`.trim()
 
-      // Update the input value
+      console.log('Parsed components:', components)
+
+      // Update the input value with just the street address
       onChange(components.address)
 
-      // Call the callback with parsed components
+      // Call the callback with ALL parsed components
+      // This should fill city, state, zipcode
       onPlaceSelected(components)
     })
 
     // Cleanup
     return () => {
-      if (autocompleteRef.current) {
-        window.google.maps.event.clearInstanceListeners(autocompleteRef.current)
+      if (listener) {
+        google.maps.event.removeListener(listener)
       }
     }
-  }, [onPlaceSelected, onChange])
+  }, [])
 
   return (
     <div>

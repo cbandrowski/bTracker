@@ -195,8 +195,8 @@ export function CreateRecurringJobDrawer({
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="max-w-3xl mx-auto max-h-[95vh]">
-        <DrawerHeader>
+      <DrawerContent className="max-w-3xl mx-auto max-h-[90vh] flex flex-col">
+        <DrawerHeader className="flex-shrink-0">
           <DrawerTitle className="flex items-center gap-2">
             <Repeat className="h-5 w-5" />
             Create Recurring Jobs
@@ -206,7 +206,7 @@ export function CreateRecurringJobDrawer({
           </DrawerDescription>
         </DrawerHeader>
 
-        <form onSubmit={handleSubmit} className="px-4 pb-4 space-y-6 overflow-y-auto">
+        <form onSubmit={handleSubmit} className="px-4 pb-4 space-y-6 overflow-y-auto flex-1">
           {error && (
             <div className="rounded-md bg-red-50 p-4 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-300">
               {error}
@@ -427,7 +427,7 @@ export function CreateRecurringJobDrawer({
           )}
         </form>
 
-        <DrawerFooter className="border-t">
+        <DrawerFooter className="border-t flex-shrink-0">
           <Button
             onClick={handleSubmit}
             disabled={

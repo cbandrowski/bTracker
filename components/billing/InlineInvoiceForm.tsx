@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -42,6 +42,9 @@ interface InvoiceLine {
   quantity: number
   unitPrice: number
   taxRate: number
+  quantityInput: string
+  unitPriceInput: string
+  taxRateInput: string
   subtotal: number
   total: number
 }
@@ -100,21 +103,49 @@ export function InlineInvoiceForm({
   // Initialize invoice lines from selected jobs
   useEffect(() => {
     const selectedJobs = jobs.filter(j => selectedJobIds.includes(j.id))
-    const jobLines: InvoiceLine[] = selectedJobs.map(job => ({
-      id: job.id,
-      type: 'job',
-      jobId: job.id,
-      description: job.title,
-      notes: job.description || '',
-      completedAt: job.completed_at,
-      quantity: 1,
-      unitPrice: job.estimated_amount || 0,
-      taxRate: 0,
-      subtotal: job.estimated_amount || 0,
-      total: job.estimated_amount || 0,
-    }))
+    const jobLines: InvoiceLine[] = selectedJobs.map(job => {
+      const price = job.estimated_amount || 0
+      return {
+        id: job.id,
+        type: 'job',
+        jobId: job.id,
+        description: job.title,
+        notes: job.description || '',
+        completedAt: job.completed_at,
+        quantity: 1,
+        unitPrice: price,
+        taxRate: 0,
+        quantityInput: '1',
+        unitPriceInput: price.toString(),
+        taxRateInput: '0',
+        subtotal: price,
+        total: price,
+      }
+    })
     setInvoiceLines(jobLines)
   }, [selectedJobIds, jobs])
+
+  const parseDecimal = (value: string) => {
+    const normalized = value.replace(/,/g, '.')
+    const num = Number.parseFloat(normalized)
+    return Number.isFinite(num) ? num : 0
+  }
+
+  const recomputeLine = (line: InvoiceLine): InvoiceLine => {
+    const quantity = parseDecimal(line.quantityInput)
+    const unitPrice = parseDecimal(line.unitPriceInput)
+    const taxRate = parseDecimal(line.taxRateInput)
+    const subtotal = quantity * unitPrice
+    const total = subtotal * (1 + taxRate / 100)
+    return {
+      ...line,
+      quantity,
+      unitPrice,
+      taxRate,
+      subtotal,
+      total,
+    }
+  }
 
   const addManualLine = () => {
     const newLine: InvoiceLine = {
@@ -125,6 +156,9 @@ export function InlineInvoiceForm({
       quantity: 1,
       unitPrice: 0,
       taxRate: 0,
+      quantityInput: '1',
+      unitPriceInput: '0',
+      taxRateInput: '0',
       subtotal: 0,
       total: 0,
     }
@@ -138,10 +172,7 @@ export function InlineInvoiceForm({
   const updateLine = (id: string, updates: Partial<InvoiceLine>) => {
     setInvoiceLines(invoiceLines.map(line => {
       if (line.id === id) {
-        const updated = { ...line, ...updates }
-        // Recalculate totals
-        updated.subtotal = updated.quantity * updated.unitPrice
-        updated.total = updated.subtotal * (1 + updated.taxRate / 100)
+        const updated = recomputeLine({ ...line, ...updates })
         return updated
       }
       return line
@@ -336,27 +367,23 @@ export function InlineInvoiceForm({
                   {/* Quantity */}
                   <div className="col-span-1">
                     <Input
-                      type="number"
-                      value={line.quantity}
-                      onChange={e =>
-                        updateLine(line.id, { quantity: parseFloat(e.target.value) || 0 })
-                      }
-                      min="0"
-                      step="1"
+                      type="text"
+                      inputMode="decimal"
+                      value={line.quantityInput}
+                      onChange={e => updateLine(line.id, { quantityInput: e.target.value })}
                       className="text-center"
+                      placeholder="0"
                     />
                   </div>
 
                   {/* Unit Price */}
                   <div className="col-span-2">
                     <Input
-                      type="number"
-                      value={line.unitPrice}
-                      onChange={e =>
-                        updateLine(line.id, { unitPrice: parseFloat(e.target.value) || 0 })
-                      }
-                      min="0"
-                      step="0.01"
+                      type="text"
+                      inputMode="decimal"
+                      value={line.unitPriceInput}
+                      onChange={e => updateLine(line.id, { unitPriceInput: e.target.value })}
+                      placeholder="0.00"
                       className="text-right"
                     />
                   </div>
@@ -364,13 +391,11 @@ export function InlineInvoiceForm({
                   {/* Tax Rate */}
                   <div className="col-span-1">
                     <Input
-                      type="number"
-                      value={line.taxRate}
-                      onChange={e =>
-                        updateLine(line.id, { taxRate: parseFloat(e.target.value) || 0 })
-                      }
-                      min="0"
-                      step="0.1"
+                      type="text"
+                      inputMode="decimal"
+                      value={line.taxRateInput}
+                      onChange={e => updateLine(line.id, { taxRateInput: e.target.value })}
+                      placeholder="0"
                       className="text-center"
                     />
                   </div>

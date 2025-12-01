@@ -101,23 +101,7 @@ export async function POST(
       .update(updateData)
       .eq('id', timeEntryId)
       .eq('company_id', companyId)
-      .select(`
-        *,
-        employee:company_employees!time_entries_employee_id_fkey(
-          id,
-          job_title,
-          profile:profiles(
-            id,
-            full_name,
-            email
-          )
-        ),
-        approver:profiles!time_entries_approved_by_fkey(
-          id,
-          full_name,
-          email
-        )
-      `)
+      .select('*')
       .single()
 
     if (updateError) {
