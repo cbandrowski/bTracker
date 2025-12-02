@@ -203,8 +203,151 @@ export default function ApprovalsTable({
         </div>
       )}
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-3 p-4">
+        {timeEntries.map((entry) => {
+          const isProcessing = processingIds.has(entry.id)
+          const employeeName = entry.employee?.profile?.full_name || 'Unknown'
+          const jobTitle = entry.schedule?.job?.title || '-'
+          const hours = calculateHours(entry.clock_in_reported_at, entry.clock_out_reported_at)
+
+          const clockInApproved = !!entry.clock_in_approved_at
+          const clockOutReported = !!entry.clock_out_reported_at
+          const clockOutApproved = !!entry.clock_out_approved_at
+
+          let statusLabel = 'Needs Approval'
+          let statusColor = 'bg-yellow-900 bg-opacity-50 text-yellow-200 border border-yellow-700'
+
+          if (clockInApproved && clockOutReported && !clockOutApproved) {
+            statusLabel = 'Clock-Out Needs Approval'
+            statusColor = 'bg-red-900 bg-opacity-50 text-red-200 border border-red-700'
+          } else if (clockInApproved && !clockOutReported) {
+            statusLabel = 'Clock-In Approved'
+            statusColor = 'bg-green-900 bg-opacity-50 text-green-200 border border-green-700'
+          }
+
+          return (
+            <div key={entry.id} className={`bg-gray-700/50 border border-purple-500/30 rounded-lg p-3 space-y-3 ${isProcessing ? 'opacity-50' : ''}`}>
+              <div className="flex justify-between items-start">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {!readonly && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(entry.id)}
+                      onChange={() => toggleSelection(entry.id)}
+                      disabled={isProcessing}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 flex-shrink-0"
+                    />
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-semibold text-white truncate">{employeeName}</h4>
+                    <p className="text-xs text-gray-400">{format(new Date(entry.clock_in_reported_at), 'MMM d, yyyy')}</p>
+                  </div>
+                </div>
+                <span className={`inline-flex px-2 py-0.5 text-[10px] font-semibold rounded whitespace-nowrap ${statusColor}`}>
+                  {statusLabel}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="space-y-1">
+                  <div className="text-gray-400">Clock In:</div>
+                  <div className="text-white">{format(new Date(entry.clock_in_reported_at), 'h:mm a')}</div>
+                  {!readonly && (
+                    <input
+                      type="time"
+                      value={adjustments[entry.id]?.clock_in?.split('T')[1]?.slice(0, 5) || ''}
+                      onChange={(e) => {
+                        const date = format(new Date(entry.clock_in_reported_at), 'yyyy-MM-dd')
+                        setAdjustments({
+                          ...adjustments,
+                          [entry.id]: {
+                            ...adjustments[entry.id],
+                            clock_in: `${date}T${e.target.value}`,
+                          },
+                        })
+                      }}
+                      disabled={isProcessing}
+                      className="w-full text-xs bg-gray-800 border border-gray-600 text-white rounded px-2 py-1"
+                    />
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <div className="text-gray-400">Clock Out:</div>
+                  {entry.clock_out_reported_at ? (
+                    <>
+                      <div className="text-white">{format(new Date(entry.clock_out_reported_at), 'h:mm a')}</div>
+                      {!readonly && (
+                        <input
+                          type="time"
+                          value={adjustments[entry.id]?.clock_out?.split('T')[1]?.slice(0, 5) || ''}
+                          onChange={(e) => {
+                            const date = format(new Date(entry.clock_out_reported_at!), 'yyyy-MM-dd')
+                            setAdjustments({
+                              ...adjustments,
+                              [entry.id]: {
+                                ...adjustments[entry.id],
+                                clock_out: `${date}T${e.target.value}`,
+                              },
+                            })
+                          }}
+                          disabled={isProcessing}
+                          className="w-full text-xs bg-gray-800 border border-gray-600 text-white rounded px-2 py-1"
+                        />
+                      )}
+                    </>
+                  ) : (
+                    <div className="text-yellow-500">Still working</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-2 border-t border-gray-600 text-xs">
+                <div>
+                  <span className="text-gray-400">Hours: </span>
+                  <span className="font-semibold text-white">
+                    {hours !== null ? hours : <LiveHoursDisplay clockIn={entry.clock_in_reported_at} />}
+                  </span>
+                </div>
+              </div>
+
+              {!readonly && (
+                <div className="space-y-2 pt-2 border-t border-gray-600">
+                  <button
+                    onClick={() => handleApprove(entry.id)}
+                    disabled={isProcessing}
+                    className="w-full px-3 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 disabled:opacity-50"
+                  >
+                    Approve
+                  </button>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={rejectReasons[entry.id] || ''}
+                      onChange={(e) =>
+                        setRejectReasons({ ...rejectReasons, [entry.id]: e.target.value })
+                      }
+                      placeholder="Reject reason..."
+                      disabled={isProcessing}
+                      className="flex-1 text-xs bg-gray-800 border border-gray-600 text-white rounded px-2 py-1"
+                    />
+                    <button
+                      onClick={() => handleReject(entry.id)}
+                      disabled={isProcessing}
+                      className="px-3 py-1 bg-red-600 text-white rounded text-xs hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
+                    >
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden lg:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-700">
           <thead className="bg-gray-900">
             <tr>

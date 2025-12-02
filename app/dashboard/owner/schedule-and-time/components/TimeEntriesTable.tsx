@@ -386,8 +386,75 @@ export default function TimeEntriesTable({ timeEntries, onExportCSV, onRefresh }
         </div>
       </div>
 
-      {/* Table */}
-      <div className="overflow-x-auto">
+      {/* Mobile Card View */}
+      <div className="lg:hidden space-y-3 p-4">
+        {timeEntries.map((entry) => {
+          const employeeName = entry.employee?.profile?.full_name || 'Unknown'
+          const jobTitle = entry.schedule?.job?.title || '-'
+          const clockIn = entry.clock_in_approved_at || entry.clock_in_reported_at
+          const clockOut = entry.clock_out_approved_at || entry.clock_out_reported_at
+          const hours = calculateHours(clockIn, clockOut)
+          const statusInfo = getDetailedStatus(entry)
+
+          return (
+            <div key={entry.id} className="bg-gray-700/50 border border-purple-500/30 rounded-lg p-3 space-y-2">
+              <div className="flex justify-between items-start">
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-sm font-semibold text-white truncate">{employeeName}</h4>
+                  <p className="text-xs text-gray-400">{format(new Date(entry.clock_in_reported_at), 'MMM d, yyyy')}</p>
+                </div>
+                <span className={`inline-flex px-2 py-0.5 text-[10px] font-semibold rounded whitespace-nowrap ${statusInfo.color}`}>
+                  {statusInfo.label}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <span className="text-gray-400">In: </span>
+                  <span className="text-white">
+                    {entry.clock_in_approved_at
+                      ? format(new Date(entry.clock_in_approved_at), 'h:mm a')
+                      : format(new Date(entry.clock_in_reported_at), 'h:mm a')}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-400">Out: </span>
+                  <span className="text-white">
+                    {clockOut ? format(new Date(clockOut), 'h:mm a') : '-'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-2 border-t border-gray-600">
+                <div className="text-xs">
+                  <span className="text-gray-400">Hours: </span>
+                  <span className="font-semibold text-white">
+                    {hours !== null ? `${hours}h` : <LiveHoursDisplay clockIn={clockIn} />}
+                  </span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => openEditDialog(entry)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-[10px] text-blue-400 hover:text-blue-300 border border-blue-500/30 rounded"
+                  >
+                    <Edit2 className="h-3 w-3" />
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => loadAdjustments(entry.id)}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-[10px] text-gray-400 hover:text-gray-300 border border-gray-500/30 rounded"
+                  >
+                    <History className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden lg:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-700">
             <thead className="bg-gray-900">
               <tr>

@@ -12,8 +12,19 @@ export interface CustomerWithBilling {
   name: string
   email: string | null
   phone: string | null
+  billing_address: string | null
+  billing_address_line_2: string | null
   billing_city: string | null
   billing_state: string | null
+  billing_zipcode: string | null
+  billing_country: string | null
+  service_address: string | null
+  service_address_line_2: string | null
+  service_city: string | null
+  service_state: string | null
+  service_zipcode: string | null
+  service_country: string | null
+  same_as_billing: boolean | null
   billedBalance: number
   unappliedCredit: number
   openInvoices: number
@@ -37,10 +48,29 @@ export async function getCustomersWithBilling(): Promise<CustomerWithBilling[]> 
     return []
   }
 
-  // Fetch customers
+  // Fetch customers with full address information
   const { data: customers, error: customersError } = await supabase
     .from('customers')
-    .select('id, name, email, phone, billing_city, billing_state, created_at')
+    .select(`
+      id,
+      name,
+      email,
+      phone,
+      billing_address,
+      billing_address_line_2,
+      billing_city,
+      billing_state,
+      billing_zipcode,
+      billing_country,
+      service_address,
+      service_address_line_2,
+      service_city,
+      service_state,
+      service_zipcode,
+      service_country,
+      same_as_billing,
+      created_at
+    `)
     .in('company_id', companyIds)
     .order('created_at', { ascending: false })
 
