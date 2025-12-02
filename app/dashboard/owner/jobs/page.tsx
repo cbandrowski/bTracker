@@ -91,6 +91,7 @@ export default function JobsPage() {
       const customerDataStr = sessionStorage.getItem('createJobForCustomer')
       if (customerDataStr) {
         const customer: Customer = JSON.parse(customerDataStr)
+        console.log('Customer data for job creation:', customer)
 
         const storedReturnPath = sessionStorage.getItem('createJobReturnPath')
         if (storedReturnPath) {
@@ -140,7 +141,13 @@ export default function JobsPage() {
     setFormData(prev => ({ ...prev, [name]: value }))
   }
 
-  const handleAddressSelect = (addressData: any) => {
+  const handleAddressSelect = (addressData: {
+    address: string
+    city: string
+    state: string
+    zipcode: string
+    country: string
+  }) => {
     setFormData(prev => ({
       ...prev,
       service_address: addressData.address,
@@ -149,6 +156,10 @@ export default function JobsPage() {
       service_zipcode: addressData.zipcode,
       service_country: addressData.country || 'USA'
     }))
+  }
+
+  const handleAddressChange = (value: string) => {
+    setFormData(prev => ({ ...prev, service_address: value }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -235,6 +246,177 @@ export default function JobsPage() {
 
   return (
     <div className="space-y-6">
+      {/* Create Job Form */}
+      {showForm && (
+        <div className="glass-surface shadow-lg rounded-lg p-6 border-2 border-purple-500">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold guild-heading">Create New Job</h2>
+            <button
+              onClick={handleCancelCreateJob}
+              className="text-gray-400 hover:text-white"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Customer Info (Read-only) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Customer</label>
+              <input
+                type="text"
+                value={formData.customer_name}
+                disabled
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white"
+              />
+            </div>
+
+            {/* Job Title */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Job Title <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleInputChange}
+                required
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="e.g., Kitchen Remodel, Roof Repair"
+              />
+            </div>
+
+            {/* Summary/Description */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Job Description / Estimate
+              </label>
+              <textarea
+                name="summary"
+                value={formData.summary}
+                onChange={handleInputChange}
+                rows={4}
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="Describe the job, scope of work, materials needed, estimated cost..."
+              />
+            </div>
+
+            {/* Service Address - Pre-filled from Customer */}
+            <div className="bg-gray-700/50 border border-purple-500/30 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <label className="block text-sm font-medium text-gray-300">
+                  Service Address
+                  <span className="ml-2 text-xs text-gray-400">(from customer record)</span>
+                </label>
+              </div>
+
+              <div className="space-y-3">
+                <input
+                  type="text"
+                  name="service_address"
+                  value={formData.service_address}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Street address"
+                  readOnly
+                />
+
+                <input
+                  type="text"
+                  name="service_address_line_2"
+                  value={formData.service_address_line_2}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Apt, Suite, Unit, Building, Floor, etc."
+                  readOnly
+                />
+
+                <div className="grid grid-cols-3 gap-3">
+                  <input
+                    type="text"
+                    name="service_city"
+                    value={formData.service_city}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="City"
+                    readOnly
+                  />
+                  <input
+                    type="text"
+                    name="service_state"
+                    value={formData.service_state}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="State"
+                    readOnly
+                  />
+                  <input
+                    type="text"
+                    name="service_zipcode"
+                    value={formData.service_zipcode}
+                    onChange={handleInputChange}
+                    className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Zip"
+                    readOnly
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Tasks to Complete */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Tasks to Complete
+              </label>
+              <textarea
+                name="tasks_to_complete"
+                value={formData.tasks_to_complete}
+                onChange={handleInputChange}
+                rows={3}
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                placeholder="List specific tasks, deliverables, or milestones..."
+              />
+            </div>
+
+            {/* Planned End Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Planned Completion Date
+              </label>
+              <input
+                type="date"
+                name="planned_end_date"
+                value={formData.planned_end_date}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex justify-end gap-4 pt-4 border-t border-gray-600">
+              <button
+                type="button"
+                onClick={handleCancelCreateJob}
+                disabled={submitting}
+                className="px-6 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50"
+              >
+                {submitting ? 'Creating...' : 'Create Job'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       <div className="glass-surface shadow-lg rounded-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold guild-heading">
