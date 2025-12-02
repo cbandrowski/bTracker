@@ -2,6 +2,7 @@
  * /api/time-entries
  *
  * GET: List time entries with filters (status, date range, employee_id)
+ * POST: Create a manual time entry (owner-created) with reason
  */
 
 import { NextRequest, NextResponse } from 'next/server'
@@ -15,6 +16,13 @@ const GetTimeEntriesQuerySchema = z.object({
   employee_id: z.string().uuid().optional(),
   status: z.enum(['pending_clock_in', 'pending_approval', 'approved', 'rejected', 'all']).optional(),
   exclude_payroll: z.enum(['true', 'false']).optional(), // Filter out entries already in payroll
+})
+
+const CreateTimeEntrySchema = z.object({
+  employee_id: z.string().uuid(),
+  clock_in_reported_at: z.string().datetime(),
+  clock_out_reported_at: z.string().datetime(),
+  edit_reason: z.string().optional().nullable(),
 })
 
 export async function GET(request: NextRequest) {
@@ -118,6 +126,83 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ time_entries: data || [] })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.issues },
+        { status: 422 }
+      )
+    }
+    console.error('Unexpected error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createServerClient()
+    const user = await getCurrentUser(supabase)
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const companyIds = await getUserCompanyIds(supabase, user.id)
+    if (companyIds.length === 0) {
+      return NextResponse.json({ error: 'No company found' }, { status: 404 })
+    }
+    const companyId = companyIds[0]
+
+    const body = await request.json()
+    const parsed = CreateTimeEntrySchema.safeParse(body)
+    if (!parsed.success) {
+      return NextResponse.json({ error: 'Validation error', details: parsed.error.issues }, { status: 422 })
+    }
+
+    const { employee_id, clock_in_reported_at, clock_out_reported_at, edit_reason } = parsed.data
+
+    if (new Date(clock_out_reported_at) <= new Date(clock_in_reported_at)) {
+      return NextResponse.json({ error: 'Clock out time must be after clock in time' }, { status: 400 })
+    }
+
+    // Verify employee belongs to this company
+    const { data: employee } = await supabase
+      .from('company_employees')
+      .select('id')
+      .eq('id', employee_id)
+      .eq('company_id', companyId)
+      .maybeSingle()
+
+    if (!employee) {
+      return NextResponse.json({ error: 'Employee not found in your company' }, { status: 404 })
+    }
+
+    const nowIso = new Date().toISOString()
+    const insertData: any = {
+      company_id: companyId,
+      employee_id,
+      clock_in_reported_at,
+      clock_out_reported_at,
+      clock_in_approved_at: clock_in_reported_at,
+      clock_out_approved_at: clock_out_reported_at,
+      status: 'approved',
+      edit_reason: edit_reason || null,
+      approved_by: user.id,
+      approved_at: nowIso,
+    }
+
+    const { data: inserted, error } = await supabase
+      .from('time_entries')
+      .insert(insertData)
+      .select('*')
+      .single()
+
+    if (error) {
+      console.error('Error creating time entry:', error)
+      return NextResponse.json({ error: error.message || 'Failed to create time entry' }, { status: 500 })
+    }
+
+    return NextResponse.json({ time_entry: inserted })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

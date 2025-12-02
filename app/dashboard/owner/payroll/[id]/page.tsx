@@ -10,6 +10,8 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
 
 interface PayrollRun {
   id: string
@@ -58,6 +60,33 @@ interface TimeEntry {
   }
 }
 
+interface PayStubEntry {
+  id: string
+  work_date: string
+  regular_hours: number
+  overtime_hours: number
+  gross_pay: number
+}
+
+interface PayStub {
+  id: string
+  employee_id: string
+  period_start: string
+  period_end: string
+  regular_hours: number
+  overtime_hours: number
+  total_hours: number
+  hourly_rate: number
+  gross_pay: number
+  entries?: PayStubEntry[]
+  employee?: {
+    profile?: {
+      full_name: string
+      email: string | null
+    }
+  }
+}
+
 export default function PayrollRunDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const router = useRouter()
   const [payrollRun, setPayrollRun] = useState<PayrollRun | null>(null)
@@ -68,6 +97,9 @@ export default function PayrollRunDetailsPage({ params }: { params: Promise<{ id
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null)
   const [actionLoading, setActionLoading] = useState(false)
   const [payrollRunId, setPayrollRunId] = useState<string | null>(null)
+  const [payStubs, setPayStubs] = useState<PayStub[]>([])
+  const [stubLoading, setStubLoading] = useState(false)
+  const [stubMessage, setStubMessage] = useState<string | null>(null)
 
   useEffect(() => {
     params.then(p => setPayrollRunId(p.id))
@@ -95,6 +127,7 @@ export default function PayrollRunDetailsPage({ params }: { params: Promise<{ id
       setPayrollRun(data.payroll_run)
       setLines(data.lines)
       setTimeEntries(data.time_entries)
+      await fetchPayStubs()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
@@ -152,6 +185,43 @@ export default function PayrollRunDetailsPage({ params }: { params: Promise<{ id
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred')
       setActionLoading(false)
+    }
+  }
+
+  const fetchPayStubs = async () => {
+    if (!payrollRunId) return
+    setStubLoading(true)
+    setStubMessage(null)
+    try {
+      const response = await fetch(`/api/payroll/runs/${payrollRunId}/paystubs`)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load pay stubs')
+      }
+      setPayStubs(data.pay_stubs || [])
+    } catch (err) {
+      setStubMessage(err instanceof Error ? err.message : 'Failed to load pay stubs')
+    } finally {
+      setStubLoading(false)
+    }
+  }
+
+  const handleGeneratePayStubs = async () => {
+    if (!payrollRunId) return
+    setStubLoading(true)
+    setStubMessage(null)
+    try {
+      const response = await fetch(`/api/payroll/runs/${payrollRunId}/paystubs`, { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create pay stubs')
+      }
+      setStubMessage(`Generated ${data.pay_stub_count || 0} pay stub(s).`)
+      await fetchPayStubs()
+    } catch (err) {
+      setStubMessage(err instanceof Error ? err.message : 'Failed to create pay stubs')
+    } finally {
+      setStubLoading(false)
     }
   }
 
@@ -231,6 +301,100 @@ export default function PayrollRunDetailsPage({ params }: { params: Promise<{ id
           {error}
         </div>
       )}
+
+      {/* Pay Stubs */}
+      <div className="bg-gray-800 rounded-lg border border-gray-700">
+        <div className="px-6 py-4 flex items-center justify-between border-b border-gray-700">
+          <h2 className="text-lg font-semibold text-white">Pay Stubs</h2>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleGeneratePayStubs}
+              disabled={stubLoading}
+              className="px-4 py-2"
+            >
+              {stubLoading ? 'Processing...' : 'Generate Pay Stubs'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={fetchPayStubs}
+              disabled={stubLoading}
+            >
+              Refresh
+            </Button>
+          </div>
+        </div>
+        {stubMessage && (
+          <div className="px-6 py-3 text-sm text-gray-300 border-b border-gray-700">{stubMessage}</div>
+        )}
+        {stubLoading ? (
+          <div className="px-6 py-8 text-gray-400 text-sm">Loading pay stubs...</div>
+        ) : payStubs.length === 0 ? (
+          <div className="px-6 py-8 text-gray-400 text-sm">No pay stubs yet.</div>
+        ) : (
+          <div className="divide-y divide-gray-700">
+            {payStubs.map((stub) => (
+              <div key={stub.id} className="p-6">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <div className="text-white font-semibold">
+                      {stub.employee?.profile?.full_name || 'Employee'}
+                    </div>
+                    <div className="text-sm text-gray-400">
+                      {format(new Date(stub.period_start), 'MMM d, yyyy')} -{' '}
+                      {format(new Date(stub.period_end), 'MMM d, yyyy')}
+                    </div>
+                  </div>
+                  <div className="text-right text-sm text-gray-300">
+                    <div>Total Hours: {stub.total_hours.toFixed(2)}</div>
+                    <div>Gross Pay: ${stub.gross_pay.toFixed(2)}</div>
+                    <div>Hourly: ${stub.hourly_rate.toFixed(2)}</div>
+                  </div>
+                </div>
+                {stub.entries && stub.entries.length > 0 && (
+                  <div className="mt-4 rounded border border-gray-700 overflow-hidden">
+                    <table className="min-w-full divide-y divide-gray-700">
+                      <thead className="bg-gray-750">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs text-gray-300 uppercase tracking-wider">
+                            Date
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs text-gray-300 uppercase tracking-wider">
+                            Regular Hours
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs text-gray-300 uppercase tracking-wider">
+                            OT Hours
+                          </th>
+                          <th className="px-4 py-2 text-left text-xs text-gray-300 uppercase tracking-wider">
+                            Gross
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-700">
+                        {stub.entries.map((entry) => (
+                          <tr key={entry.id}>
+                            <td className="px-4 py-2 text-sm text-white">
+                              {format(new Date(entry.work_date), 'EEE, MMM d')}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-300">
+                              {entry.regular_hours.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-300">
+                              {entry.overtime_hours.toFixed(2)}
+                            </td>
+                            <td className="px-4 py-2 text-sm text-gray-300">
+                              ${entry.gross_pay.toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -312,10 +476,11 @@ export default function PayrollRunDetailsPage({ params }: { params: Promise<{ id
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
                       ${line.overtime_pay.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                      ${line.total_gross_pay.toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                    ${line.total_gross_pay.toFixed(2)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <div className="flex justify-end gap-3">
                       <button
                         onClick={() =>
                           setSelectedEmployeeId(
@@ -326,8 +491,16 @@ export default function PayrollRunDetailsPage({ params }: { params: Promise<{ id
                       >
                         {selectedEmployeeId === line.employee_id ? 'Hide' : 'View'} Entries
                       </button>
-                    </td>
-                  </tr>
+                      <Link
+                        href={`/dashboard/owner/payroll/stubs/${line.id}`}
+                        className="text-gray-300 hover:text-white"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        Pay Stub →
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
                   {selectedEmployeeId === line.employee_id && (
                     <tr>
                       <td colSpan={8} className="px-6 py-4 bg-gray-750">

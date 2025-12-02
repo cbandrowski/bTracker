@@ -90,23 +90,24 @@ export default function Home() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center space-x-2">
-                <Shield className="h-8 w-8 text-amber-500" />
-                <span className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-400">
+                <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-amber-500" />
+                <span className="text-lg sm:text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-400">
                   GuildTasks
                 </span>
               </div>
-              <div className="flex gap-4">
+              <div className="flex gap-2 sm:gap-4">
                 <Link
                   href="/login"
-                  className="px-6 py-2 text-purple-200 hover:text-white transition-colors font-medium"
+                  className="px-3 sm:px-6 py-2 text-sm sm:text-base text-purple-200 hover:text-white transition-colors font-medium"
                 >
                   Login
                 </Link>
                 <Link
                   href="/signup"
-                  className="px-6 py-2 bg-gradient-to-r from-amber-600 to-amber-500 text-white rounded-lg hover:from-amber-500 hover:to-amber-400 transition-all shadow-lg shadow-amber-500/30 font-medium"
+                  className="px-3 sm:px-6 py-2 text-sm sm:text-base bg-gradient-to-r from-amber-600 to-amber-500 text-white rounded-lg hover:from-amber-500 hover:to-amber-400 transition-all shadow-lg shadow-amber-500/30 font-medium"
                 >
-                  Join the Guild
+                  <span className="hidden sm:inline">Join the Guild</span>
+                  <span className="sm:hidden">Join</span>
                 </Link>
               </div>
             </div>
@@ -122,14 +123,14 @@ export default function Home() {
                 <div className="absolute inset-0 blur-xl bg-amber-400/30"></div>
               </div>
             </div>
-            <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight">
+            <h1 className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight px-2">
               Forge Your Business
               <br />
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-purple-400 to-amber-400">
                 Into Legend
               </span>
             </h1>
-            <p className="text-xl sm:text-2xl text-purple-200 mb-12 max-w-3xl mx-auto leading-relaxed">
+            <p className="text-base sm:text-xl md:text-2xl text-purple-200 mb-12 max-w-3xl mx-auto leading-relaxed px-4">
               Command your guild with powerful tools to track quests, recruit adventurers,
               and manage your workforce with the wisdom of ancient strategy.
             </p>

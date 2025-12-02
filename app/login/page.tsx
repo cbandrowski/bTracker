@@ -125,10 +125,10 @@ export default function LoginPage() {
               <div className="absolute inset-0 blur-xl bg-blue-400/30"></div>
             </div>
           </div>
-          <h2 className="text-4xl font-bold text-white mb-2">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2">
             Welcome Back, Warrior
           </h2>
-          <p className="text-blue-200 text-lg mb-2">
+          <p className="text-blue-200 text-base sm:text-lg mb-2">
             Return to your guild and continue your quest
           </p>
           <p className="text-sm text-blue-300">

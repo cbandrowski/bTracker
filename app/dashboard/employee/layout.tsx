@@ -233,18 +233,18 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
         <div className="absolute bottom-20 right-20 w-96 h-96 bg-teal-500/10 rounded-full blur-3xl"></div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 relative z-10">
         {/* Header */}
-        <div className="bg-slate-800/50 backdrop-blur-md shadow-2xl rounded-xl border border-cyan-500/30 mb-6">
-          <div className="px-6 py-5 flex justify-between items-center">
-            <div>
-              <div className="flex items-center gap-3 mb-1">
-                <Shield className="h-8 w-8 text-cyan-400" />
-                <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400">
+        <div className="bg-slate-800/50 backdrop-blur-md shadow-2xl rounded-xl border border-cyan-500/30 mb-4 sm:mb-6">
+          <div className="px-3 sm:px-6 py-4 sm:py-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 sm:gap-3 mb-1">
+                <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-cyan-400 flex-shrink-0" />
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 truncate">
                   Warrior Dashboard
                 </h1>
               </div>
-              <p className="mt-1 text-sm text-cyan-200">
+              <p className="mt-1 text-xs sm:text-sm text-cyan-200 truncate">
                 Welcome back, {profile?.full_name || user?.email}!
               </p>
             </div>
@@ -253,21 +253,22 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
                 await supabase.auth.signOut()
                 router.push('/login')
               }}
-              className="flex items-center gap-2 px-5 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all shadow-lg"
+              className="flex items-center gap-2 px-3 sm:px-5 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all shadow-lg text-sm whitespace-nowrap"
             >
-              <LogOut className="h-4 w-4" />
-              Sign Out
+              <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="hidden sm:inline">Sign Out</span>
+              <span className="sm:hidden">Out</span>
             </button>
           </div>
         </div>
 
         {/* Layout with Sidebar and Content */}
-        <div className="flex flex-col lg:flex-row gap-6">
+        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
           <EmployeeSidebar menu={menu} />
 
           {/* Main Content */}
           <main className="flex-1 bg-slate-800/50 backdrop-blur-md rounded-xl border border-cyan-500/30 overflow-hidden shadow-2xl">
-            <div className="p-6">
+            <div className="p-3 sm:p-4 md:p-6">
               {children}
             </div>
           </main>

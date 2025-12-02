@@ -38,6 +38,19 @@ export default function SchedulePage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [employeeFilter, setEmployeeFilter] = useState<string>('all')
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null)
+  const [showMonthPicker, setShowMonthPicker] = useState(false)
+
+  // Recurring shift creation states
+  const [showRecurringDialog, setShowRecurringDialog] = useState(false)
+  const [recurringEmployee, setRecurringEmployee] = useState<string>('')
+  const [recurringStartTime, setRecurringStartTime] = useState('09:00')
+  const [recurringEndTime, setRecurringEndTime] = useState('17:00')
+  const [recurringDays, setRecurringDays] = useState<number[]>([]) // 0=Sun, 1=Mon, etc.
+  const [recurringDuration, setRecurringDuration] = useState<'1week' | '2weeks' | '3weeks' | '4weeks' | 'month'>('1week')
+  const [recurringStartDate, setRecurringStartDate] = useState(new Date().toISOString().split('T')[0])
+  const [recurringSameHours, setRecurringSameHours] = useState(true)
+  const [recurringDayHours, setRecurringDayHours] = useState<Record<number, { start: string; end: string }>>({})
+  const [isCreatingRecurring, setIsCreatingRecurring] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -308,6 +321,111 @@ export default function SchedulePage() {
     }
   }
 
+  const handleCreateRecurringShifts = async () => {
+    if (!recurringEmployee || recurringDays.length === 0) {
+      alert('Please select an employee and at least one day of the week')
+      return
+    }
+
+    if (!recurringSameHours) {
+      const invalidDay = recurringDays.find((day) => {
+        const config = recurringDayHours[day]
+        const start = config?.start || recurringStartTime
+        const end = config?.end || recurringEndTime
+        if (!start || !end) return true
+        return end <= start
+      })
+
+      if (invalidDay !== undefined) {
+        alert('Please provide valid start/end times for each selected day (end must be after start).')
+        return
+      }
+    }
+
+    setIsCreatingRecurring(true)
+
+    try {
+      const dayHoursPayload = recurringSameHours
+        ? undefined
+        : recurringDays.map((day) => {
+            const override = recurringDayHours[day]
+            return {
+              day_of_week: day,
+              start_time: override?.start || recurringStartTime,
+              end_time: override?.end || recurringEndTime,
+            }
+          })
+
+      const response = await fetch('/api/schedule/recurring', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          employee_id: recurringEmployee,
+          start_time: recurringStartTime,
+          end_time: recurringEndTime,
+          days_of_week: recurringDays,
+          duration: recurringDuration,
+          start_date: recurringStartDate,
+          company_id: companyId,
+          day_hours: dayHoursPayload,
+        }),
+      })
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create recurring shifts')
+      }
+
+      const data = await response.json()
+      alert(`Successfully created ${data.count} shifts!`)
+
+      setShowRecurringDialog(false)
+      setRecurringEmployee('')
+      setRecurringDays([])
+      setRecurringStartTime('09:00')
+      setRecurringEndTime('17:00')
+      setRecurringDuration('1week')
+      setRecurringSameHours(true)
+      setRecurringDayHours({})
+
+      // Reload assignments
+      window.location.reload()
+    } catch (error) {
+      console.error('Error creating recurring shifts:', error)
+      alert(error instanceof Error ? error.message : 'Failed to create recurring shifts')
+    } finally {
+      setIsCreatingRecurring(false)
+    }
+  }
+
+  const toggleRecurringDay = (day: number) => {
+    setRecurringDays(prev => {
+      const nextDays = prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
+      if (!recurringSameHours) {
+        setRecurringDayHours((current) => {
+          const copy = { ...current }
+          if (nextDays.includes(day)) {
+            copy[day] = copy[day] || { start: recurringStartTime, end: recurringEndTime }
+          } else {
+            delete copy[day]
+          }
+          return copy
+        })
+      }
+      return nextDays
+    })
+  }
+
+  const updateDayHours = (day: number, field: 'start' | 'end', value: string) => {
+    setRecurringDayHours((prev) => ({
+      ...prev,
+      [day]: {
+        start: field === 'start' ? value : prev[day]?.start || recurringStartTime,
+        end: field === 'end' ? value : prev[day]?.end || recurringEndTime,
+      }
+    }))
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -321,7 +439,15 @@ export default function SchedulePage() {
       {/* Header with filters */}
       <div className="bg-slate-900/50 backdrop-blur-sm shadow-xl rounded-xl p-6 border border-purple-500/20">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-400">Quest Schedule</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-400">Quest Schedule</h2>
+            <button
+              onClick={() => setShowRecurringDialog(true)}
+              className="mt-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all text-sm font-medium shadow-lg"
+            >
+              + Create Recurring Shifts
+            </button>
+          </div>
 
           {/* Filters */}
           <div className="flex flex-wrap gap-4">
@@ -396,21 +522,105 @@ export default function SchedulePage() {
             ← Previous
           </button>
 
-          <div className="text-center">
-            <h3 className="text-xl font-semibold guild-heading">
+          <div className="text-center relative">
+            <button
+              onClick={() => setShowMonthPicker(!showMonthPicker)}
+              className="text-xl font-semibold guild-heading hover:text-primary transition-colors"
+            >
               {currentDate.toLocaleDateString('en-US', {
                 month: 'long',
                 year: 'numeric',
                 ...(viewMode === 'month' ? {} : { day: 'numeric' }),
                 ...(viewMode === 'day' ? { weekday: 'long' } : {})
               })}
-            </h3>
+              <span className="ml-2 text-sm">▼</span>
+            </button>
             <button
               onClick={goToToday}
-              className="text-sm text-primary hover:text-primary/80 mt-1"
+              className="text-sm text-primary hover:text-primary/80 mt-1 block"
             >
               Today
             </button>
+
+            {/* Month/Year Picker Dropdown */}
+            {showMonthPicker && (
+              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-4 z-50 min-w-[300px]">
+                <div className="space-y-4">
+                  {/* Year Selector */}
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Year</label>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const newDate = new Date(currentDate)
+                          newDate.setFullYear(currentDate.getFullYear() - 1)
+                          setCurrentDate(newDate)
+                        }}
+                        className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded"
+                      >
+                        ←
+                      </button>
+                      <select
+                        value={currentDate.getFullYear()}
+                        onChange={(e) => {
+                          const newDate = new Date(currentDate)
+                          newDate.setFullYear(parseInt(e.target.value))
+                          setCurrentDate(newDate)
+                        }}
+                        className="flex-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white"
+                      >
+                        {Array.from({ length: 5 }, (_, i) => {
+                          const year = new Date().getFullYear() - 1 + i
+                          return <option key={year} value={year}>{year}</option>
+                        })}
+                      </select>
+                      <button
+                        onClick={() => {
+                          const newDate = new Date(currentDate)
+                          newDate.setFullYear(currentDate.getFullYear() + 1)
+                          setCurrentDate(newDate)
+                        }}
+                        className="px-2 py-1 bg-gray-800 hover:bg-gray-700 rounded"
+                      >
+                        →
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Month Grid */}
+                  <div>
+                    <label className="text-xs text-gray-400 mb-2 block">Month</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'].map((month, index) => (
+                        <button
+                          key={month}
+                          onClick={() => {
+                            const newDate = new Date(currentDate)
+                            newDate.setMonth(index)
+                            setCurrentDate(newDate)
+                            setShowMonthPicker(false)
+                          }}
+                          className={`px-3 py-2 rounded text-sm font-medium transition-colors ${
+                            currentDate.getMonth() === index
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                          }`}
+                        >
+                          {month}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setShowMonthPicker(false)}
+                    className="w-full px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <button
@@ -757,6 +967,244 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
+
+      {/* Recurring Shifts Creation Dialog */}
+      {showRecurringDialog && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-xl border border-purple-500/30 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-gray-700">
+              <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
+                Create Recurring Shifts
+              </h3>
+              <p className="text-gray-400 text-sm mt-1">Set up repeating shifts for your team</p>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Employee Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Employee *</label>
+                <select
+                  value={recurringEmployee}
+                  onChange={(e) => setRecurringEmployee(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="">Select Employee</option>
+                  {employees.map(emp => (
+                    <option key={emp.id} value={emp.id}>{emp.full_name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Start Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Start Date *</label>
+                <input
+                  type="date"
+                  value={recurringStartDate}
+                  onChange={(e) => setRecurringStartDate(e.target.value)}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                />
+              </div>
+
+              {/* Time Range */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">Start Time *</label>
+                  <input
+                    type="time"
+                    value={recurringStartTime}
+                    onChange={(e) => setRecurringStartTime(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">End Time *</label>
+                  <input
+                    type="time"
+                    value={recurringEndTime}
+                    onChange={(e) => setRecurringEndTime(e.target.value)}
+                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-2 focus:ring-purple-500"
+                  />
+                </div>
+              </div>
+
+              {/* Hours mode */}
+              <div className="flex items-center gap-3">
+                <label className="text-sm text-gray-300 font-medium">Use same hours for all selected days</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !recurringSameHours
+                    setRecurringSameHours(next)
+                    if (next) {
+                      setRecurringDayHours({})
+                    } else {
+                      setRecurringDayHours((prev) => {
+                        const nextMap: Record<number, { start: string; end: string }> = {}
+                        recurringDays.forEach((day) => {
+                          nextMap[day] = prev[day] || { start: recurringStartTime, end: recurringEndTime }
+                        })
+                        return nextMap
+                      })
+                    }
+                  }}
+                  className={`px-3 py-1 rounded-md text-sm font-semibold ${
+                    recurringSameHours
+                      ? 'bg-purple-700 text-white'
+                      : 'bg-gray-700 text-gray-200'
+                  }`}
+                >
+                  {recurringSameHours ? 'Same Hours' : 'Custom Per Day'}
+                </button>
+              </div>
+
+              {/* Days of Week */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-3">Days of Week *</label>
+                <div className="flex gap-2 flex-wrap">
+                  {[
+                    { day: 0, label: 'S', full: 'Sunday' },
+                    { day: 1, label: 'M', full: 'Monday' },
+                    { day: 2, label: 'T', full: 'Tuesday' },
+                    { day: 3, label: 'W', full: 'Wednesday' },
+                    { day: 4, label: 'T', full: 'Thursday' },
+                    { day: 5, label: 'F', full: 'Friday' },
+                    { day: 6, label: 'S', full: 'Saturday' },
+                  ].map(({ day, label, full }) => (
+                    <button
+                      key={day}
+                      onClick={() => toggleRecurringDay(day)}
+                      className={`w-12 h-12 rounded-lg font-bold transition-all ${
+                        recurringDays.includes(day)
+                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg scale-105'
+                          : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      }`}
+                      title={full}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Click to toggle days</p>
+              </div>
+
+              {/* Per-day hours */}
+              {!recurringSameHours && recurringDays.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="text-sm text-gray-300 font-medium">Set hours for each selected day</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRecurringDayHours((prev) => {
+                          const next: Record<number, { start: string; end: string }> = {}
+                          recurringDays.forEach((day) => {
+                            next[day] = prev[day] || { start: recurringStartTime, end: recurringEndTime }
+                          })
+                          return next
+                        })
+                      }}
+                      className="text-xs px-3 py-1 rounded-md bg-gray-700 text-gray-100 hover:bg-gray-600"
+                    >
+                      Fill all with first time
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {recurringDays.map((day) => {
+                      const config = recurringDayHours[day] || { start: recurringStartTime, end: recurringEndTime }
+                      return (
+                        <div key={day} className="bg-gray-900 border border-gray-700 rounded-lg p-3">
+                          <div className="text-sm text-gray-200 font-semibold mb-2">
+                            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day]}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="time"
+                              value={config.start}
+                              onChange={(e) => updateDayHours(day, 'start', e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:ring-2 focus:ring-purple-500"
+                            />
+                            <input
+                              type="time"
+                              value={config.end}
+                              onChange={(e) => updateDayHours(day, 'end', e.target.value)}
+                              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:ring-2 focus:ring-purple-500"
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Duration */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Repeat For *</label>
+                <select
+                  value={recurringDuration}
+                  onChange={(e) => setRecurringDuration(e.target.value as any)}
+                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
+                >
+                  <option value="1week">Next 1 Week</option>
+                  <option value="2weeks">Next 2 Weeks</option>
+                  <option value="3weeks">Next 3 Weeks</option>
+                  <option value="4weeks">Next 4 Weeks</option>
+                  <option value="month">Rest of Month</option>
+                </select>
+              </div>
+
+              {/* Summary */}
+              {recurringEmployee && recurringDays.length > 0 && (
+                <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
+                  <p className="text-sm text-purple-200">
+                    <strong>Preview:</strong> Creating shifts for{' '}
+                    <strong>{employees.find(e => e.id === recurringEmployee)?.full_name}</strong>
+                    {' '}on{' '}
+                    <strong>{recurringDays.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}</strong>
+                    {' '}{
+                      recurringSameHours
+                        ? <>from <strong>{recurringStartTime}</strong> to <strong>{recurringEndTime}</strong></>
+                        : 'with custom hours per selected day'
+                    }
+                    {' '}for <strong>{recurringDuration.replace('weeks', ' weeks').replace('week', ' week').replace('month', ' the rest of the month')}</strong>
+                  </p>
+                  {!recurringSameHours && (
+                    <div className="mt-2 text-xs text-purple-100 space-y-1">
+                      {recurringDays.map((day) => {
+                        const config = recurringDayHours[day] || { start: recurringStartTime, end: recurringEndTime }
+                        return (
+                          <div key={day} className="flex justify-between">
+                            <span>{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]}</span>
+                            <span>{config.start} - {config.end}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 border-t border-gray-700 flex justify-end gap-3">
+              <button
+                onClick={() => setShowRecurringDialog(false)}
+                disabled={isCreatingRecurring}
+                className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateRecurringShifts}
+                disabled={isCreatingRecurring || !recurringEmployee || recurringDays.length === 0}
+                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              >
+                {isCreatingRecurring ? 'Creating...' : 'Create Shifts'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

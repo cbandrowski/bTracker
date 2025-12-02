@@ -30,6 +30,7 @@ export default function EmployeeSchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null)
+  const [viewType, setViewType] = useState<'schedule' | 'jobs'>('schedule')
 
   useEffect(() => {
     const fetchData = async () => {
@@ -300,6 +301,30 @@ export default function EmployeeSchedulePage() {
 
           {/* Filters */}
           <div className="flex flex-wrap gap-4">
+            {/* View Type Toggle */}
+            <div className="flex bg-slate-800/50 border border-cyan-500/30 rounded-lg overflow-hidden backdrop-blur-sm">
+              <button
+                onClick={() => setViewType('schedule')}
+                className={`px-4 py-2 font-medium transition-all ${
+                  viewType === 'schedule'
+                    ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg'
+                    : 'text-cyan-200 hover:bg-cyan-500/10'
+                }`}
+              >
+                📅 Schedule View
+              </button>
+              <button
+                onClick={() => setViewType('jobs')}
+                className={`px-4 py-2 font-medium transition-all border-l border-cyan-500/30 ${
+                  viewType === 'jobs'
+                    ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg'
+                    : 'text-cyan-200 hover:bg-cyan-500/10'
+                }`}
+              >
+                📋 All Jobs
+              </button>
+            </div>
+
             {/* Status Filter */}
             <select
               value={statusFilter}
@@ -312,39 +337,41 @@ export default function EmployeeSchedulePage() {
               <option value="completed">Completed Only</option>
             </select>
 
-            {/* View Mode Toggle */}
-            <div className="flex bg-slate-800/50 border border-cyan-500/30 rounded-lg overflow-hidden backdrop-blur-sm">
-              <button
-                onClick={() => setViewMode('day')}
-                className={`px-4 py-2 font-medium transition-all ${
-                  viewMode === 'day'
-                    ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg'
-                    : 'text-cyan-200 hover:bg-cyan-500/10'
-                }`}
-              >
-                Day
-              </button>
-              <button
-                onClick={() => setViewMode('week')}
-                className={`px-4 py-2 font-medium transition-all border-x border-cyan-500/30 ${
-                  viewMode === 'week'
-                    ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg'
-                    : 'text-cyan-200 hover:bg-cyan-500/10'
-                }`}
-              >
-                Week
-              </button>
-              <button
-                onClick={() => setViewMode('month')}
-                className={`px-4 py-2 font-medium transition-all ${
-                  viewMode === 'month'
-                    ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg'
-                    : 'text-cyan-200 hover:bg-cyan-500/10'
-                }`}
-              >
-                Month
-              </button>
-            </div>
+            {/* Calendar View Mode Toggle (only show in schedule view) */}
+            {viewType === 'schedule' && (
+              <div className="flex bg-slate-800/50 border border-cyan-500/30 rounded-lg overflow-hidden backdrop-blur-sm">
+                <button
+                  onClick={() => setViewMode('day')}
+                  className={`px-4 py-2 font-medium transition-all ${
+                    viewMode === 'day'
+                      ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg'
+                      : 'text-cyan-200 hover:bg-cyan-500/10'
+                  }`}
+                >
+                  Day
+                </button>
+                <button
+                  onClick={() => setViewMode('week')}
+                  className={`px-4 py-2 font-medium transition-all border-x border-cyan-500/30 ${
+                    viewMode === 'week'
+                      ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg'
+                      : 'text-cyan-200 hover:bg-cyan-500/10'
+                  }`}
+                >
+                  Week
+                </button>
+                <button
+                  onClick={() => setViewMode('month')}
+                  className={`px-4 py-2 font-medium transition-all ${
+                    viewMode === 'month'
+                      ? 'bg-gradient-to-r from-cyan-600 to-teal-600 text-white shadow-lg'
+                      : 'text-cyan-200 hover:bg-cyan-500/10'
+                  }`}
+                >
+                  Month
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -371,43 +398,104 @@ export default function EmployeeSchedulePage() {
         </div>
       </div>
 
-      {/* Calendar Navigation */}
-      <div className="bg-gray-800 shadow-lg rounded-lg p-4 border border-gray-700">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={goToPrevious}
-            className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
-          >
-            ← Previous
-          </button>
-
-          <div className="text-center">
-            <h3 className="text-xl font-semibold guild-heading">
-              {currentDate.toLocaleDateString('en-US', {
-                month: 'long',
-                year: 'numeric',
-                ...(viewMode === 'month' ? {} : { day: 'numeric' }),
-                ...(viewMode === 'day' ? { weekday: 'long' } : {})
-              })}
-            </h3>
+      {/* Calendar Navigation - Only show in schedule view */}
+      {viewType === 'schedule' && (
+        <div className="bg-gray-800 shadow-lg rounded-lg p-4 border border-gray-700">
+          <div className="flex items-center justify-between">
             <button
-              onClick={goToToday}
-              className="text-sm text-primary hover:text-primary/80 mt-1"
+              onClick={goToPrevious}
+              className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
             >
-              Today
+              ← Previous
+            </button>
+
+            <div className="text-center">
+              <h3 className="text-xl font-semibold guild-heading">
+                {currentDate.toLocaleDateString('en-US', {
+                  month: 'long',
+                  year: 'numeric',
+                  ...(viewMode === 'month' ? {} : { day: 'numeric' }),
+                  ...(viewMode === 'day' ? { weekday: 'long' } : {})
+                })}
+              </h3>
+              <button
+                onClick={goToToday}
+                className="text-sm text-primary hover:text-primary/80 mt-1"
+              >
+                Today
+              </button>
+            </div>
+
+            <button
+              onClick={goToNext}
+              className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
+            >
+              Next →
             </button>
           </div>
-
-          <button
-            onClick={goToNext}
-            className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
-          >
-            Next →
-          </button>
         </div>
-      </div>
+      )}
 
-      {viewMode === 'day' ? (
+      {/* All Jobs List View */}
+      {viewType === 'jobs' && (
+        <div className="glass-surface shadow-lg rounded-lg p-6">
+          <h3 className="text-lg font-semibold guild-heading mb-4">All Assigned Jobs</h3>
+          {filteredAssignments.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No jobs assigned
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredAssignments.map(assignment => (
+                <div
+                  key={assignment.id}
+                  className={`p-4 rounded-lg border cursor-pointer transition-all hover:ring-2 hover:ring-primary ${getStatusColor(assignment.assignment_status)}`}
+                  onClick={() => setSelectedAssignment(assignment)}
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="text-lg font-semibold text-foreground mb-1">
+                        {assignment.job?.title || 'Untitled Job'}
+                      </h4>
+                      <div className="text-sm text-muted-foreground mb-2">
+                        {assignment.job?.customer?.name || 'No customer'}
+                      </div>
+                      {assignment.service_start_at && (
+                        <div className="text-sm text-gray-300 mb-1">
+                          📅 {new Date(assignment.service_start_at).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            month: 'long',
+                            day: 'numeric',
+                            year: 'numeric'
+                          })}
+                        </div>
+                      )}
+                      {assignment.service_start_at && (
+                        <div className="text-sm text-gray-300">
+                          🕐 {formatTimeRange(assignment.service_start_at, assignment.service_end_at)}
+                        </div>
+                      )}
+                      {assignment.job?.service_address && (
+                        <div className="text-sm text-gray-400 mt-2">
+                          📍 {assignment.job.service_address}
+                          {assignment.job.service_city && `, ${assignment.job.service_city}`}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(assignment.assignment_status)}`}>
+                        {getStatusBadge(assignment.assignment_status)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {viewType === 'schedule' && viewMode === 'day' ? (
         <div className="glass-surface shadow-lg rounded-lg p-6">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold guild-heading">Daily Schedule</h3>
@@ -486,7 +574,7 @@ export default function EmployeeSchedulePage() {
             </div>
           </div>
         </div>
-      ) : (
+      ) : viewType === 'schedule' ? (
         <div className="glass-surface shadow-lg rounded-lg p-6">
           {/* Day headers */}
           <div className="grid grid-cols-7 gap-2 mb-4">
@@ -574,10 +662,10 @@ export default function EmployeeSchedulePage() {
             })}
           </div>
         </div>
-      )}
+      ) : null}
 
-      {/* Upcoming Assignments List */}
-      {filteredAssignments.filter(a => {
+      {/* Upcoming Assignments List - Only show in schedule view */}
+      {viewType === 'schedule' && filteredAssignments.filter(a => {
         if (!a.service_start_at) return false
         return new Date(a.service_start_at) >= new Date()
       }).length > 0 && (
