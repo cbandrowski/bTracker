@@ -106,29 +106,11 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: 'Quests',
-      link: '/dashboard/owner/jobs',
-      icon: (
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-        </svg>
-      ),
-    },
-    {
-      label: 'Quest Assignments',
+      label: 'Job Assignments',
       link: '/dashboard/owner/assignments',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-        </svg>
-      ),
-    },
-    {
-      label: 'Quest Board',
-      link: '/dashboard/owner/job-board',
-      icon: (
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
         </svg>
       ),
     },
@@ -202,28 +184,17 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
                 Welcome back, {profile?.full_name || user?.email}!
               </p>
             </div>
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut()
-                router.push('/login')
-              }}
-              className="flex items-center gap-2 px-3 sm:px-5 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all shadow-lg text-sm whitespace-nowrap"
-            >
-              <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Sign Out</span>
-              <span className="sm:hidden">Out</span>
-            </button>
           </div>
         </div>
 
         {/* Layout with Sidebar and Content */}
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6 print:block print:gap-0">
+        <div className="flex lg:flex-row gap-0 lg:gap-6 print:block print:gap-0">
           <div className="print:hidden">
             <OwnerSidebar menu={menu} />
           </div>
 
-          {/* Main Content */}
-          <main className="flex-1 bg-slate-800/50 backdrop-blur-md rounded-xl border border-purple-500/30 overflow-hidden shadow-2xl print:border-0 print:rounded-none print:bg-white print:overflow-visible">
+          {/* Main Content - takes full width on mobile */}
+          <main className="flex-1 w-full lg:w-auto bg-slate-800/50 backdrop-blur-md rounded-xl border border-purple-500/30 overflow-hidden shadow-2xl print:border-0 print:rounded-none print:bg-white print:overflow-visible">
             <div className="p-3 sm:p-4 md:p-6 print:p-0">
               {children}
             </div>

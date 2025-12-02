@@ -248,26 +248,15 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
                 Welcome back, {profile?.full_name || user?.email}!
               </p>
             </div>
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut()
-                router.push('/login')
-              }}
-              className="flex items-center gap-2 px-3 sm:px-5 py-2 bg-red-600/80 text-white rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all shadow-lg text-sm whitespace-nowrap"
-            >
-              <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Sign Out</span>
-              <span className="sm:hidden">Out</span>
-            </button>
           </div>
         </div>
 
         {/* Layout with Sidebar and Content */}
-        <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+        <div className="flex lg:flex-row gap-0 lg:gap-6">
           <EmployeeSidebar menu={menu} />
 
-          {/* Main Content */}
-          <main className="flex-1 bg-slate-800/50 backdrop-blur-md rounded-xl border border-cyan-500/30 overflow-hidden shadow-2xl">
+          {/* Main Content - takes full width on mobile */}
+          <main className="flex-1 w-full lg:w-auto bg-slate-800/50 backdrop-blur-md rounded-xl border border-cyan-500/30 overflow-hidden shadow-2xl">
             <div className="p-3 sm:p-4 md:p-6">
               {children}
             </div>

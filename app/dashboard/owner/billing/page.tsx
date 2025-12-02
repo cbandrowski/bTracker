@@ -104,18 +104,19 @@ export default function BillingPage() {
         <UnbilledJobsTable jobs={unbilledJobs} loading={unbilledLoading} />
       </div>
 
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Two Column Layout - Side by side on all screen sizes */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-6">
         {/* Recent Invoices */}
-        <div className="rounded-lg border-border p-6 glass-surface">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold guild-heading">
+        <div className="rounded-lg border-border p-3 sm:p-6 glass-surface">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 sm:mb-4 gap-2">
+            <h2 className="text-sm sm:text-lg font-semibold guild-heading">
               Recent Invoices
             </h2>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.push('/dashboard/owner/billing/customers')}
+              className="text-xs sm:text-sm self-start sm:self-auto"
             >
               View All
             </Button>
@@ -127,15 +128,16 @@ export default function BillingPage() {
         </div>
 
         {/* Customers with Outstanding Balance */}
-        <div className="rounded-lg border-border p-6 glass-surface">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold guild-heading">
+        <div className="rounded-lg border-border p-3 sm:p-6 glass-surface">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 sm:mb-4 gap-2">
+            <h2 className="text-sm sm:text-lg font-semibold guild-heading">
               Outstanding Balances
             </h2>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.push('/dashboard/owner/billing/customers')}
+              className="text-xs sm:text-sm self-start sm:self-auto"
             >
               View All
             </Button>
