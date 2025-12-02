@@ -26,6 +26,7 @@ export default function BillingCustomersPage() {
   const [customers, setCustomers] = useState<CustomerWithBilling[]>([])
   const [filteredCustomers, setFilteredCustomers] = useState<CustomerWithBilling[]>([])
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [jobStatusFilter, setJobStatusFilter] = useState<JobStatusFilter>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [depositDrawerOpen, setDepositDrawerOpen] = useState(false)
@@ -39,31 +40,20 @@ export default function BillingCustomersPage() {
   // Fetch customers with job status information
   const fetchCustomersData = async () => {
     try {
-      setLoading(true)
+      if (customers.length === 0) {
+        setLoading(true)
+      } else {
+        setRefreshing(true)
+      }
+      // Pull billing info only; skip per-customer job status to avoid N+1 requests.
       const billingData = await getCustomersWithBilling()
-
-      // Fetch job status for each customer
-      const customersWithJobs = await Promise.all(
-        billingData.map(async (customer) => {
-          try {
-            const response = await fetch(`/api/customers/${customer.id}/job-status`)
-            if (response.ok) {
-              const jobData = await response.json()
-              return { ...customer, jobStatus: jobData }
-            }
-          } catch (error) {
-            console.error('Error fetching job status:', error)
-          }
-          return { ...customer, jobStatus: { hasActiveJobs: false, statusCounts: {} } }
-        })
-      )
-
-      setCustomers(customersWithJobs)
-      setFilteredCustomers(customersWithJobs)
+      setCustomers(billingData)
+      setFilteredCustomers(billingData)
     } catch (error) {
       console.error('Error fetching customers:', error)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
@@ -191,8 +181,9 @@ export default function BillingCustomersPage() {
       </div>
 
       {/* Results count */}
-      <div className="text-sm text-gray-400">
-        Showing {filteredCustomers.length} of {customers.length} customers
+      <div className="flex items-center gap-2 text-sm text-gray-400">
+        <span>Showing {filteredCustomers.length} of {customers.length} customers</span>
+        {refreshing && <span className="text-xs text-gray-500">(Refreshing...)</span>}
       </div>
 
       {/* Customers Table */}

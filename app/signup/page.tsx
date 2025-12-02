@@ -133,10 +133,10 @@ export default function SignupPage() {
               <div className="absolute inset-0 blur-xl bg-emerald-400/30"></div>
             </div>
           </div>
-          <h2 className="text-4xl font-bold text-white mb-2">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-2">
             Join the Guild
           </h2>
-          <p className="text-emerald-200 text-lg mb-2">
+          <p className="text-emerald-200 text-base sm:text-lg mb-2">
             Sign the registry and begin your adventure
           </p>
           <p className="text-sm text-emerald-300">

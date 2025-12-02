@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { CompanyEmployee, EmployeeAvailability, Profile } from '@/types/database'
 import Image from 'next/image'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 interface EmployeeWithProfile extends CompanyEmployee {
   profile: Profile
@@ -29,6 +31,8 @@ export default function EmployeeDetailPage() {
   const [availability, setAvailability] = useState<EmployeeAvailability[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [hourlyRateInput, setHourlyRateInput] = useState<string>('')
+  const [savingRate, setSavingRate] = useState(false)
 
   useEffect(() => {
     const fetchEmployeeDetails = async () => {
@@ -53,6 +57,11 @@ export default function EmployeeDetailPage() {
         }
 
         setEmployee(employeeData as any)
+        setHourlyRateInput(
+          employeeData?.hourly_rate !== null && employeeData?.hourly_rate !== undefined
+            ? Number(employeeData.hourly_rate).toFixed(2)
+            : ''
+        )
 
         // Fetch availability
         const response = await fetch(`/api/employees/${employeeId}/availability`)
@@ -110,6 +119,42 @@ export default function EmployeeDetailPage() {
         return 'bg-orange-900 bg-opacity-50 text-orange-200 border border-orange-700'
       default:
         return 'bg-gray-700 text-gray-300 border border-gray-600'
+    }
+  }
+
+  const handleSaveHourlyRate = async () => {
+    if (!employeeId) return
+    const parsed = Number.parseFloat(hourlyRateInput || '0')
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      alert('Enter a valid hourly rate (0 or higher).')
+      return
+    }
+
+    try {
+      setSavingRate(true)
+      const response = await fetch(`/api/employees/${employeeId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hourly_rate: parsed }),
+      })
+
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to update pay rate')
+      }
+
+      setEmployee(data.employee as EmployeeWithProfile)
+      setHourlyRateInput(
+        data.employee?.hourly_rate !== null && data.employee?.hourly_rate !== undefined
+          ? Number(data.employee.hourly_rate).toFixed(2)
+          : ''
+      )
+      alert('Hourly rate updated')
+    } catch (err) {
+      console.error('Error updating pay rate:', err)
+      alert(err instanceof Error ? err.message : 'Failed to update pay rate')
+    } finally {
+      setSavingRate(false)
     }
   }
 
@@ -240,6 +285,30 @@ export default function EmployeeDetailPage() {
                   </dd>
                 </div>
               )}
+
+              <div className="md:col-span-2 border-t border-gray-700 pt-4">
+                <dt className="text-sm font-medium text-gray-400">Hourly Rate</dt>
+                <dd className="mt-2 flex items-center gap-3">
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={hourlyRateInput}
+                    onChange={(e) => setHourlyRateInput(e.target.value)}
+                    placeholder="e.g. 20.00"
+                    className="w-40 bg-gray-900 border-gray-700 text-white"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSaveHourlyRate}
+                    disabled={savingRate}
+                  >
+                    {savingRate ? 'Saving...' : 'Save Rate'}
+                  </Button>
+                </dd>
+                <p className="text-xs text-gray-500 mt-1">
+                  Used for payroll calculations.
+                </p>
+              </div>
             </dl>
           </div>
         </div>

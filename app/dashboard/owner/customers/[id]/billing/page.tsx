@@ -13,8 +13,8 @@ import {
 } from '@/hooks/useCustomerBilling'
 import { UnpaidJobsTable } from '@/components/billing/UnpaidJobsTable'
 import { DepositsList } from '@/components/billing/DepositsList'
-import { InvoiceBuilderDrawer } from '@/components/billing/InvoiceBuilderDrawer'
 import { InvoicesList } from '@/components/billing/InvoicesList'
+import { InlineInvoiceForm } from '@/components/billing/InlineInvoiceForm'
 import { AddPaymentDrawer } from '@/components/customers/AddPaymentDrawer'
 import { useToast } from '@/hooks/useToast'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -91,6 +91,11 @@ export default function CustomerBillingPage({ params }: PageProps) {
   const handleCreateInvoice = (jobIds: string[]) => {
     setSelectedJobIds(jobIds)
     setInvoiceDrawerOpen(true)
+  }
+
+  const handleCancelInvoice = () => {
+    setInvoiceDrawerOpen(false)
+    setSelectedJobIds([])
   }
 
   const handleToggleDeposit = (depositId: string, checked: boolean) => {
@@ -186,7 +191,6 @@ export default function CustomerBillingPage({ params }: PageProps) {
           </Button>
           <Button
             onClick={() => handleCreateInvoice([])}
-            disabled={unpaidJobs.loading}
           >
             <Plus className="mr-2 h-4 w-4" />
             Create Invoice
@@ -194,109 +198,115 @@ export default function CustomerBillingPage({ params }: PageProps) {
         </div>
       </div>
 
-      {/* Billing Header Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="rounded-lg border p-4 bg-white dark:bg-gray-800">
-          <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            Billed Balance
-          </div>
-          {billingHeader.loading ? (
-            <Skeleton className="h-8 w-32 mt-2" />
-          ) : (
-            <div className="mt-2 text-2xl font-bold">
-              <Badge
-                variant={
-                  (billingHeader.data?.billedBalance || 0) > 0
-                    ? 'destructive'
-                    : 'secondary'
-                }
-                className="text-lg px-3 py-1"
-              >
-                {formatCurrency(billingHeader.data?.billedBalance || 0)}
-              </Badge>
+      {/* Billing Header Cards - hidden while creating an invoice */}
+      {!invoiceDrawerOpen && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="rounded-lg border p-4 bg-white dark:bg-gray-800">
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Billed Balance
             </div>
-          )}
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Total invoiced minus payments
-          </p>
-        </div>
-
-        <div className="rounded-lg border p-4 bg-white dark:bg-gray-800">
-          <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            Unapplied Credit
+            {billingHeader.loading ? (
+              <Skeleton className="h-8 w-32 mt-2" />
+            ) : (
+              <div className="mt-2 text-2xl font-bold">
+                <Badge
+                  variant={
+                    (billingHeader.data?.billedBalance || 0) > 0
+                      ? 'destructive'
+                      : 'secondary'
+                  }
+                  className="text-lg px-3 py-1"
+                >
+                  {formatCurrency(billingHeader.data?.billedBalance || 0)}
+                </Badge>
+              </div>
+            )}
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Total invoiced minus payments
+            </p>
           </div>
-          {billingHeader.loading ? (
-            <Skeleton className="h-8 w-32 mt-2" />
-          ) : (
-            <div className="mt-2 text-2xl font-bold">
-              <Badge
-                variant={(billingHeader.data?.unappliedCredit || 0) > 0 ? 'default' : 'secondary'}
-                className="text-lg px-3 py-1"
-              >
-                {formatCurrency(billingHeader.data?.unappliedCredit || 0)}
-              </Badge>
-            </div>
-          )}
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Available to apply to invoices
-          </p>
-        </div>
 
-        <div className="rounded-lg border p-4 bg-white dark:bg-gray-800">
-          <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
-            Open Invoices
+          <div className="rounded-lg border p-4 bg-white dark:bg-gray-800">
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Unapplied Credit
+            </div>
+            {billingHeader.loading ? (
+              <Skeleton className="h-8 w-32 mt-2" />
+            ) : (
+              <div className="mt-2 text-2xl font-bold">
+                <Badge
+                  variant={(billingHeader.data?.unappliedCredit || 0) > 0 ? 'default' : 'secondary'}
+                  className="text-lg px-3 py-1"
+                >
+                  {formatCurrency(billingHeader.data?.unappliedCredit || 0)}
+                </Badge>
+              </div>
+            )}
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Available to apply to invoices
+            </p>
           </div>
-          {billingHeader.loading ? (
-            <Skeleton className="h-8 w-32 mt-2" />
-          ) : (
-            <div className="mt-2 text-2xl font-bold">
-              {billingHeader.data?.openInvoices || 0}
+
+          <div className="rounded-lg border p-4 bg-white dark:bg-gray-800">
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
+              Open Invoices
             </div>
-          )}
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            Unpaid or partially paid
-          </p>
-        </div>
-      </div>
-
-      {/* Unpaid Done Jobs */}
-      <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
-        <h2 className="text-lg font-semibold mb-4">Unpaid Done Jobs</h2>
-        <UnpaidJobsTable
-          jobs={unpaidJobs.data}
-          loading={unpaidJobs.loading}
-          onCreateInvoice={handleCreateInvoice}
-        />
-      </div>
-
-      {/* Deposits Available */}
-      {unappliedPayments.data && unappliedPayments.data.items.length > 0 && (
-        <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
-          <h2 className="text-lg font-semibold mb-4">Deposits Available</h2>
-          <DepositsList
-            deposits={unappliedPayments.data.items}
-            loading={unappliedPayments.loading}
-            selectedDepositIds={selectedDepositIds}
-            onToggleDeposit={handleToggleDeposit}
-          />
+            {billingHeader.loading ? (
+              <Skeleton className="h-8 w-32 mt-2" />
+            ) : (
+              <div className="mt-2 text-2xl font-bold">
+                {billingHeader.data?.openInvoices || 0}
+              </div>
+            )}
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Unpaid or partially paid
+            </p>
+          </div>
         </div>
       )}
 
-      {/* Invoices List */}
-      <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
-        <h2 className="text-lg font-semibold mb-4">Invoices</h2>
-        <InvoicesList invoices={invoices} loading={invoicesLoading} />
-      </div>
+      {/* Invoice Form inline when open */}
+      {invoiceDrawerOpen ? (
+        <InlineInvoiceForm
+          selectedJobIds={selectedJobIds}
+          jobs={unpaidJobs.data || []}
+          deposits={unappliedPayments.data?.items || []}
+          companyInfo={null}
+          onSubmit={handleInvoiceSubmit}
+          onCancel={handleCancelInvoice}
+        />
+      ) : (
+        <>
+          {/* Unpaid Done Jobs */}
+          <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+            <h2 className="text-lg font-semibold mb-4">Unpaid Done Jobs</h2>
+            <UnpaidJobsTable
+              jobs={unpaidJobs.data}
+              loading={unpaidJobs.loading}
+              onCreateInvoice={handleCreateInvoice}
+            />
+          </div>
 
-      {/* Invoice Builder Drawer */}
-      <InvoiceBuilderDrawer
-        open={invoiceDrawerOpen}
-        onOpenChange={setInvoiceDrawerOpen}
-        selectedJobIds={selectedJobIds}
-        jobs={unpaidJobs.data}
-        deposits={unappliedPayments.data?.items || []}
-        onSubmit={handleInvoiceSubmit}
-      />
+          {/* Deposits Available */}
+          {unappliedPayments.data && unappliedPayments.data.items.length > 0 && (
+            <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+              <h2 className="text-lg font-semibold mb-4">Deposits Available</h2>
+              <DepositsList
+                deposits={unappliedPayments.data.items}
+                loading={unappliedPayments.loading}
+                selectedDepositIds={selectedDepositIds}
+                onToggleDeposit={handleToggleDeposit}
+              />
+            </div>
+          )}
+
+          {/* Invoices List */}
+          <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
+            <h2 className="text-lg font-semibold mb-4">Invoices</h2>
+            <InvoicesList invoices={invoices} loading={invoicesLoading} />
+          </div>
+        </>
+      )}
 
       {/* Add Payment Drawer */}
       {customerName && (

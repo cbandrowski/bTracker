@@ -17,9 +17,11 @@ export default function JobsPage() {
   const [showForm, setShowForm] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [returnPath, setReturnPath] = useState<string | null>(null)
+  const [hasReturnPath, setHasReturnPath] = useState(false)
 
   // Form state
-  const [formData, setFormData] = useState({
+  const createEmptyForm = () => ({
     customer_id: '',
     customer_name: '', // For display only
     title: '',
@@ -33,6 +35,7 @@ export default function JobsPage() {
     tasks_to_complete: '',
     planned_end_date: ''
   })
+  const [formData, setFormData] = useState(createEmptyForm)
 
   useEffect(() => {
     const fetchJobs = async () => {
@@ -88,6 +91,12 @@ export default function JobsPage() {
       const customerDataStr = sessionStorage.getItem('createJobForCustomer')
       if (customerDataStr) {
         const customer: Customer = JSON.parse(customerDataStr)
+
+        const storedReturnPath = sessionStorage.getItem('createJobReturnPath')
+        if (storedReturnPath) {
+          setReturnPath(storedReturnPath)
+          setHasReturnPath(true)
+        }
 
         // Pre-fill form with customer data
         setFormData({
@@ -180,22 +189,12 @@ export default function JobsPage() {
 
       setJobs(prev => [response.data!, ...prev])
       setShowForm(false)
+      setReturnPath(null)
+      setHasReturnPath(false)
+      sessionStorage.removeItem('createJobReturnPath')
 
       // Reset form
-      setFormData({
-        customer_id: '',
-        customer_name: '',
-        title: '',
-        summary: '',
-        service_address: '',
-        service_address_line_2: '',
-        service_city: '',
-        service_state: '',
-        service_zipcode: '',
-        service_country: 'USA',
-        tasks_to_complete: '',
-        planned_end_date: ''
-      })
+      setFormData(createEmptyForm())
 
       alert('Job created successfully!')
     } catch (error) {
@@ -204,6 +203,19 @@ export default function JobsPage() {
     }
 
     setSubmitting(false)
+  }
+
+  const handleCancelCreateJob = () => {
+    setShowForm(false)
+    setFormData(createEmptyForm())
+
+    const storedReturn = returnPath ?? sessionStorage.getItem('createJobReturnPath')
+    const destination = hasReturnPath && storedReturn ? storedReturn : '/dashboard/owner/jobs'
+
+    sessionStorage.removeItem('createJobReturnPath')
+    setReturnPath(null)
+    setHasReturnPath(false)
+    router.replace(destination)
   }
 
   // Filter out paid jobs from all views
@@ -228,177 +240,7 @@ export default function JobsPage() {
           <h2 className="text-lg font-semibold guild-heading">
             Job Board ({jobs.length} total)
           </h2>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring"
-          >
-            {showForm ? 'Cancel' : '+ Create Job'}
-          </button>
         </div>
-
-        {/* Create Job Form */}
-        {showForm && (
-          <form onSubmit={handleSubmit} className="mb-6 p-4 glass-surface rounded-lg">
-            <h3 className="text-md font-semibold guild-heading mb-4">New Job</h3>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-muted-foreground mb-1">
-                  Customer *
-                </label>
-                <input
-                  type="text"
-                  value={formData.customer_name}
-                  disabled
-                  className="w-full px-3 py-2 glass-surface rounded-md text-muted-foreground cursor-not-allowed"
-                  placeholder="Select customer from Customer List"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Go to Customers tab and click "Create Job" to select a customer
-                </p>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-muted-foreground mb-1">
-                  Job Title *
-                </label>
-                <input
-                  type="text"
-                  name="title"
-                  value={formData.title}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="e.g., Roof Repair, Lawn Maintenance"
-                  className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-muted-foreground mb-1">
-                  Summary
-                </label>
-                <textarea
-                  name="summary"
-                  value={formData.summary}
-                  onChange={handleInputChange}
-                  rows={2}
-                  placeholder="Brief description of the job"
-                  className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-muted-foreground mb-1">
-                  Planned End Date
-                </label>
-                <input
-                  type="date"
-                  name="planned_end_date"
-                  value={formData.planned_end_date}
-                  onChange={handleInputChange}
-                  className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <h4 className="text-sm font-semibold text-white mb-2">Service Location</h4>
-
-              <div className="grid grid-cols-1 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Street Address
-                  </label>
-                  <AddressAutocomplete
-                    value={formData.service_address}
-                    onChange={(value) => setFormData(prev => ({ ...prev, service_address: value }))}
-                    onPlaceSelected={handleAddressSelect}
-                    placeholder="Start typing address..."
-                    className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-muted-foreground mb-1">
-                    Address Line 2
-                  </label>
-                  <input
-                    type="text"
-                    name="service_address_line_2"
-                    value={formData.service_address_line_2}
-                    onChange={handleInputChange}
-                    placeholder="Apt, Suite, Unit, etc."
-                    className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  />
-                </div>
-
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">City</label>
-                    <input
-                      type="text"
-                      name="service_city"
-                      value={formData.service_city}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">State</label>
-                    <input
-                      type="text"
-                      name="service_state"
-                      value={formData.service_state}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-muted-foreground mb-1">Zip</label>
-                    <input
-                      type="text"
-                      name="service_zipcode"
-                      value={formData.service_zipcode}
-                      onChange={handleInputChange}
-                      className="w-full px-3 py-2 glass-surface rounded-md text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <label className="block text-sm font-medium text-gray-300 mb-1">
-                Tasks to Complete
-              </label>
-              <textarea
-                name="tasks_to_complete"
-                value={formData.tasks_to_complete}
-                onChange={handleInputChange}
-                rows={4}
-                placeholder="List the tasks that need to be completed for this job..."
-                className="w-full px-3 py-2 bg-gray-800 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="mt-4 flex justify-end space-x-3">
-              <button
-                type="button"
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted focus:outline-none"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={submitting || !formData.customer_id}
-                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
-              >
-                {submitting ? 'Creating...' : 'Create Job'}
-              </button>
-            </div>
-          </form>
-        )}
 
         {/* Job Board - 3 Columns */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

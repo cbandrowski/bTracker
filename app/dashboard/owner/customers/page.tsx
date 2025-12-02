@@ -183,6 +183,10 @@ export default function CustomersPage() {
         if (response.error) throw new Error(response.error)
 
         setCustomers(prev => [response.data!, ...prev])
+
+        // Refresh billing data to show the new customer in the table
+        await fetchCustomersData()
+
         alert('Customer created successfully!')
       }
 
