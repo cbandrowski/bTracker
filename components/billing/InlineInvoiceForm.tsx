@@ -6,13 +6,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Plus, X } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
@@ -41,10 +34,8 @@ interface InvoiceLine {
   completedAt?: string
   quantity: number
   unitPrice: number
-  taxRate: number
   quantityInput: string
   unitPriceInput: string
-  taxRateInput: string
   subtotal: number
   total: number
 }
@@ -94,11 +85,12 @@ export function InlineInvoiceForm({
 }: InlineInvoiceFormProps) {
   const [invoiceLines, setInvoiceLines] = useState<InvoiceLine[]>([])
   const [selectedDepositIds, setSelectedDepositIds] = useState<Set<string>>(new Set())
-  const [terms, setTerms] = useState('Net 30')
   const [issueNow, setIssueNow] = useState(true)
   const [dueDate, setDueDate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [taxRate, setTaxRate] = useState(0)
+  const [taxRateInput, setTaxRateInput] = useState('')
 
   // Initialize invoice lines from selected jobs
   useEffect(() => {
@@ -114,10 +106,8 @@ export function InlineInvoiceForm({
         completedAt: job.completed_at,
         quantity: 1,
         unitPrice: price,
-        taxRate: 0,
         quantityInput: '1',
         unitPriceInput: price.toString(),
-        taxRateInput: '0',
         subtotal: price,
         total: price,
       }
@@ -134,16 +124,13 @@ export function InlineInvoiceForm({
   const recomputeLine = (line: InvoiceLine): InvoiceLine => {
     const quantity = parseDecimal(line.quantityInput)
     const unitPrice = parseDecimal(line.unitPriceInput)
-    const taxRate = parseDecimal(line.taxRateInput)
     const subtotal = quantity * unitPrice
-    const total = subtotal * (1 + taxRate / 100)
     return {
       ...line,
       quantity,
       unitPrice,
-      taxRate,
       subtotal,
-      total,
+      total: subtotal,
     }
   }
 
@@ -155,10 +142,8 @@ export function InlineInvoiceForm({
       notes: '',
       quantity: 1,
       unitPrice: 0,
-      taxRate: 0,
       quantityInput: '1',
       unitPriceInput: '0',
-      taxRateInput: '0',
       subtotal: 0,
       total: 0,
     }
@@ -205,9 +190,15 @@ export function InlineInvoiceForm({
     })
   }
 
+  // Update tax rate when input changes
+  useEffect(() => {
+    const rate = parseDecimal(taxRateInput)
+    setTaxRate(rate)
+  }, [taxRateInput])
+
   // Calculate totals
   const subtotal = invoiceLines.reduce((sum, line) => sum + line.subtotal, 0)
-  const tax = invoiceLines.reduce((sum, line) => sum + (line.total - line.subtotal), 0)
+  const tax = subtotal * (taxRate / 100)
   const total = subtotal + tax
   const depositApplied = Array.from(selectedDepositIds).reduce((sum, id) => {
     const deposit = deposits.find(d => d.paymentId === id)
@@ -218,7 +209,7 @@ export function InlineInvoiceForm({
   // Validation
   const depositsExceedTotal = depositApplied > total
   const hasContent = invoiceLines.length > 0
-  const needsDueDate = issueNow && !dueDate && terms !== 'Due on Receipt'
+  const needsDueDate = issueNow && !dueDate
   const hasInvalidLines = invoiceLines.some(line => !line.description.trim())
 
   const canSubmit = hasContent && !depositsExceedTotal && !needsDueDate && !hasInvalidLines
@@ -235,7 +226,7 @@ export function InlineInvoiceForm({
         description: line.description,
         quantity: line.quantity,
         unitPrice: line.unitPrice,
-        taxRate: line.taxRate,
+        taxRate: taxRate, // Apply the global tax rate to all lines
         jobId: line.type === 'job' ? line.jobId : null,
       }))
 
@@ -243,7 +234,7 @@ export function InlineInvoiceForm({
         jobIds,
         lines,
         depositIds: Array.from(selectedDepositIds),
-        terms,
+        terms: 'Net 30', // Default terms since we removed the dropdown
         issueNow,
         dueDate: dueDate || undefined,
       })
@@ -327,10 +318,9 @@ export function InlineInvoiceForm({
               <div className="grid grid-cols-12 gap-4 bg-gray-100 dark:bg-gray-800 p-3 text-sm font-semibold border-b">
                 <div className="col-span-4">Description / Notes</div>
                 <div className="col-span-2">Completed</div>
-                <div className="col-span-1 text-center">Qty</div>
+                <div className="col-span-2 text-center">Qty</div>
                 <div className="col-span-2 text-right">Unit Price</div>
-                <div className="col-span-1 text-center">Tax %</div>
-                <div className="col-span-1 text-right">Total</div>
+                <div className="col-span-1 text-right">Subtotal</div>
                 <div className="col-span-1"></div>
               </div>
 
@@ -365,7 +355,7 @@ export function InlineInvoiceForm({
                   </div>
 
                   {/* Quantity */}
-                  <div className="col-span-1">
+                  <div className="col-span-2">
                     <Input
                       type="text"
                       inputMode="decimal"
@@ -388,21 +378,9 @@ export function InlineInvoiceForm({
                     />
                   </div>
 
-                  {/* Tax Rate */}
-                  <div className="col-span-1">
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={line.taxRateInput}
-                      onChange={e => updateLine(line.id, { taxRateInput: e.target.value })}
-                      placeholder="0"
-                      className="text-center"
-                    />
-                  </div>
-
-                  {/* Total */}
+                  {/* Subtotal */}
                   <div className="col-span-1 flex items-center justify-end text-sm font-medium">
-                    {formatCurrency(line.total)}
+                    {formatCurrency(line.subtotal)}
                   </div>
 
                   {/* Delete Button */}
@@ -459,23 +437,8 @@ export function InlineInvoiceForm({
           </div>
         )}
 
-        {/* Terms and Due Date */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="terms">Payment Terms</Label>
-            <Select value={terms} onValueChange={setTerms}>
-              <SelectTrigger id="terms">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Due on Receipt">Due on Receipt</SelectItem>
-                <SelectItem value="Net 15">Net 15</SelectItem>
-                <SelectItem value="Net 30">Net 30</SelectItem>
-                <SelectItem value="Net 60">Net 60</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
+        {/* Due Date */}
+        <div className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="dueDate">Due Date</Label>
             <Input
@@ -484,6 +447,73 @@ export function InlineInvoiceForm({
               value={dueDate}
               onChange={e => setDueDate(e.target.value)}
             />
+          </div>
+
+          {/* Quick Due Date Presets */}
+          <div className="space-y-2">
+            <Label className="text-sm text-gray-600 dark:text-gray-400">Quick Due Date:</Label>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const date = new Date()
+                  date.setDate(date.getDate() + 7)
+                  setDueDate(date.toISOString().split('T')[0])
+                }}
+              >
+                1 Week
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const date = new Date()
+                  date.setDate(date.getDate() + 10)
+                  setDueDate(date.toISOString().split('T')[0])
+                }}
+              >
+                10 Days
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const date = new Date()
+                  date.setDate(date.getDate() + 14)
+                  setDueDate(date.toISOString().split('T')[0])
+                }}
+              >
+                2 Weeks
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const date = new Date()
+                  date.setDate(date.getDate() + 21)
+                  setDueDate(date.toISOString().split('T')[0])
+                }}
+              >
+                3 Weeks
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const date = new Date()
+                  const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0)
+                  setDueDate(lastDay.toISOString().split('T')[0])
+                }}
+              >
+                End of Month
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -505,10 +535,40 @@ export function InlineInvoiceForm({
             <span className="text-gray-600 dark:text-gray-400">Subtotal</span>
             <span className="font-medium">{formatCurrency(subtotal)}</span>
           </div>
-          <div className="flex justify-between text-base">
-            <span className="text-gray-600 dark:text-gray-400">Tax</span>
-            <span className="font-medium">{formatCurrency(tax)}</span>
+
+          {/* Tax Rate Input */}
+          <div className="flex justify-between items-center gap-4 py-2 border-t">
+            <div className="flex items-center gap-2">
+              <Label htmlFor="taxRate" className="text-gray-600 dark:text-gray-400">
+                Tax Rate (%)
+              </Label>
+              <span className="text-xs text-gray-500 dark:text-gray-400">
+                (optional - leave blank if no tax)
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Input
+                id="taxRate"
+                type="text"
+                inputMode="decimal"
+                value={taxRateInput}
+                onChange={e => setTaxRateInput(e.target.value)}
+                placeholder="0"
+                className="w-20 text-right"
+              />
+              <span className="text-gray-600 dark:text-gray-400">%</span>
+            </div>
           </div>
+
+          {taxRate > 0 && (
+            <div className="flex justify-between text-base">
+              <span className="text-gray-600 dark:text-gray-400">
+                Tax ({taxRate.toFixed(2)}%)
+              </span>
+              <span className="font-medium">{formatCurrency(tax)}</span>
+            </div>
+          )}
+
           <div className="flex justify-between text-lg font-semibold border-t pt-3">
             <span>Total</span>
             <span>{formatCurrency(total)}</span>
