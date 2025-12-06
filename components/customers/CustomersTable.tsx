@@ -17,9 +17,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { MoreHorizontal, Eye, CreditCard, FileText, Plus, Edit, Briefcase, Repeat, FilePlus2 } from 'lucide-react'
+import { MoreHorizontal, Eye, CreditCard, FileText, Plus, Edit, Briefcase, Repeat, FilePlus2, Search, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 
 interface CustomersTableProps {
   customers: CustomerWithBilling[]
@@ -33,6 +33,7 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
   const router = useRouter()
   const [sortColumn, setSortColumn] = useState<keyof CustomerWithBilling | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const handleCreateJob = (customer: CustomerWithBilling) => {
     const currentPath = `${window.location.pathname}${window.location.search}`
@@ -52,7 +53,43 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
     setSortDirection(newDirection)
   }
 
-  const sortedCustomers = [...customers].sort((a, b) => {
+  // Filter customers based on search query - only show matches
+  const filteredCustomers = useMemo(() => {
+    if (!searchQuery.trim()) return customers
+
+    const query = searchQuery.toLowerCase().trim()
+
+    return customers.filter(customer => {
+      // Search in name
+      if (customer.name?.toLowerCase().includes(query)) return true
+
+      // Search in phone (strip formatting from both)
+      const cleanPhone = customer.phone?.replace(/\D/g, '') || ''
+      const cleanQuery = query.replace(/\D/g, '')
+      if (cleanQuery && cleanPhone.includes(cleanQuery)) return true
+
+      // Search in billing address
+      if (customer.billing_address?.toLowerCase().includes(query)) return true
+      if (customer.billing_address_line_2?.toLowerCase().includes(query)) return true
+      if (customer.billing_city?.toLowerCase().includes(query)) return true
+      if (customer.billing_state?.toLowerCase().includes(query)) return true
+      if (customer.billing_zipcode?.toLowerCase().includes(query)) return true
+
+      // Search in service address
+      if (customer.service_address?.toLowerCase().includes(query)) return true
+      if (customer.service_address_line_2?.toLowerCase().includes(query)) return true
+      if (customer.service_city?.toLowerCase().includes(query)) return true
+      if (customer.service_state?.toLowerCase().includes(query)) return true
+      if (customer.service_zipcode?.toLowerCase().includes(query)) return true
+
+      // Search in email
+      if (customer.email?.toLowerCase().includes(query)) return true
+
+      return false
+    })
+  }, [customers, searchQuery])
+
+  const sortedCustomers = [...filteredCustomers].sort((a, b) => {
     if (!sortColumn) return 0
 
     const aValue = a[sortColumn]
@@ -106,6 +143,34 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
 
   return (
     <>
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search customers by name, phone, address, email..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-10 py-3 bg-slate-800/50 border border-purple-500/30 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              aria-label="Clear search"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="mt-2 text-sm text-gray-400">
+            Showing {sortedCustomers.length} of {customers.length} customer{customers.length !== 1 ? 's' : ''}
+          </p>
+        )}
+      </div>
+
       {/* Mobile Card View */}
       <div className="lg:hidden space-y-4">
         {sortedCustomers.map((customer) => (
@@ -117,11 +182,22 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
             <div className="flex justify-between items-start">
               <div className="flex-1">
                 <h3 className="font-semibold text-white text-lg">{customer.name}</h3>
-                {customer.billing_city && customer.billing_state && (
+                {customer.billing_address ? (
+                  <p className="text-sm text-gray-400">
+                    {customer.billing_address}
+                    {customer.billing_address_line_2 && `, ${customer.billing_address_line_2}`}
+                    {customer.billing_city && customer.billing_state && (
+                      <>
+                        <br />
+                        {customer.billing_city}, {customer.billing_state} {customer.billing_zipcode || ''}
+                      </>
+                    )}
+                  </p>
+                ) : customer.billing_city && customer.billing_state ? (
                   <p className="text-sm text-gray-400">
                     {customer.billing_city}, {customer.billing_state}
                   </p>
-                )}
+                ) : null}
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -326,9 +402,20 @@ export function CustomersTable({ customers, onAddDeposit, onAddPayment, onEditCu
                 </TableCell>
                 <TableCell>
                   <div className="text-sm text-gray-500 dark:text-gray-400">
-                    {customer.billing_city && customer.billing_state
-                      ? `${customer.billing_city}, ${customer.billing_state}`
-                      : '-'}
+                    {customer.billing_address ? (
+                      <>
+                        {customer.billing_address}
+                        {customer.billing_address_line_2 && `, ${customer.billing_address_line_2}`}
+                        <br />
+                        {customer.billing_city && customer.billing_state
+                          ? `${customer.billing_city}, ${customer.billing_state} ${customer.billing_zipcode || ''}`
+                          : ''}
+                      </>
+                    ) : customer.billing_city && customer.billing_state ? (
+                      `${customer.billing_city}, ${customer.billing_state}`
+                    ) : (
+                      '-'
+                    )}
                   </div>
                 </TableCell>
                 <TableCell className="text-right">

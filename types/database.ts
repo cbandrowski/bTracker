@@ -30,6 +30,8 @@ export interface Company {
   phone: string | null
   email: string | null
   website: string | null
+  logo_url: string | null
+  show_address_on_invoice: boolean
   created_at: string
   updated_at: string
 }

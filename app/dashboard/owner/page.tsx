@@ -297,7 +297,7 @@ export default function OwnerDashboardPage() {
       const formData = new FormData()
       formData.append('file', file)
 
-      const response = await fetch('/api/accountant/logo', {
+      const response = await fetch('/api/company/logo', {
         method: 'POST',
         body: formData,
       })
@@ -576,6 +576,19 @@ export default function OwnerDashboardPage() {
                         </dd>
                       </div>
                     )}
+
+                    <div className="sm:col-span-2">
+                      <dt className="text-sm font-medium text-gray-400">Invoice Settings</dt>
+                      <dd className="mt-1 text-sm text-white">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium ${
+                          company.show_address_on_invoice
+                            ? 'bg-green-600 text-white'
+                            : 'bg-gray-600 text-gray-300'
+                        }`}>
+                          {company.show_address_on_invoice ? '✓ Show address on invoices' : '✗ Hide address on invoices'}
+                        </span>
+                      </dd>
+                    </div>
                   </dl>
 
                   <div className="mt-6 p-4 bg-blue-900 rounded-md border border-blue-700">
