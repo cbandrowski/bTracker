@@ -260,9 +260,14 @@ export default function CustomersPage() {
       same_as_billing: fullCustomer.same_as_billing,
       notes: fullCustomer.notes || ''
     })
-    setShowForm(true)
-    // Scroll to form
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setShowForm(false) // Don't show the top form
+    // Scroll to the customer row after a brief delay to let the edit form render
+    setTimeout(() => {
+      const element = document.getElementById(`customer-${fullCustomer.id}`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
   }
 
   const handleCancelEdit = () => {
@@ -585,6 +590,16 @@ export default function CustomersPage() {
             onAddPayment={handleAddPayment}
             onEditCustomer={handleEditCustomer}
             onCreateRecurringJob={handleCreateRecurringJob}
+            editingCustomer={editingCustomer}
+            formData={formData}
+            onFormChange={setFormData}
+            onSubmit={handleSubmit}
+            onCancelEdit={handleCancelEdit}
+            submitting={submitting}
+            onBillingAddressSelect={handleBillingAddressSelect}
+            onServiceAddressSelect={handleServiceAddressSelect}
+            onSameAsBillingToggle={handleSameAsBillingToggle}
+            onInputChange={handleInputChange}
           />
         )}
       </div>

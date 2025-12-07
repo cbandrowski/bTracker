@@ -1,6 +1,5 @@
 'use client'
 
-import { useRef } from 'react'
 import { Customer, CustomerJob, CustomerInvoice, CustomerPayment, CustomerStats } from '@/types/customer-details'
 import { CustomerHeader } from './CustomerHeader'
 import { CustomerInfoPanel } from './CustomerInfoPanel'
@@ -22,27 +21,10 @@ export function CustomerDetailsClient({
   payments,
   stats,
 }: CustomerDetailsClientProps) {
-  const infoPanelRef = useRef<{ scrollIntoEdit: () => void }>(null)
-
-  const handleEditClick = () => {
-    // Scroll to info panel and trigger edit mode
-    const infoPanelElement = document.getElementById('customer-info-panel')
-    if (infoPanelElement) {
-      infoPanelElement.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      // Small delay to allow scroll to complete before triggering edit
-      setTimeout(() => {
-        const editButton = infoPanelElement.querySelector('button')
-        if (editButton) {
-          editButton.click()
-        }
-      }, 300)
-    }
-  }
-
   return (
     <>
       {/* Header */}
-      <CustomerHeader customer={customer} onEditClick={handleEditClick} />
+      <CustomerHeader customer={customer} />
 
       {/* Two-column layout on desktop, stacked on mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

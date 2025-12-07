@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { OwnerSidebar } from '@/components/dashboard/OwnerSidebar'
-import { Crown, LogOut } from 'lucide-react'
+import { Crown, LogOut, Settings } from 'lucide-react'
 
 export default function OwnerLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth()

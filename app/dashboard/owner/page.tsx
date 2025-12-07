@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Upload, Building2, User, Loader2, Save, Edit2 } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Upload, Building2, User, Loader2, Save, Edit2, CreditCard, X } from 'lucide-react'
 
 interface Accountant {
   id?: string
@@ -71,6 +72,22 @@ export default function OwnerDashboardPage() {
     accountant_zipcode: '',
     accountant_country: 'USA',
   })
+
+  const [paymentPreferences, setPaymentPreferences] = useState({
+    paypal_handle: '',
+    zelle_phone: '',
+    zelle_email: '',
+    check_payable_to: '',
+    accept_cash: false,
+    accept_credit_debit: false,
+    late_fee_enabled: false,
+    late_fee_days: 30,
+    late_fee_amount: 25.00,
+  })
+
+  const [paymentEditMode, setPaymentEditMode] = useState(false)
+  const [savingPayment, setSavingPayment] = useState(false)
+  const [applyingLateFees, setApplyingLateFees] = useState(false)
 
   useEffect(() => {
     console.log('Owner Dashboard: Auth state check', {
@@ -154,6 +171,19 @@ export default function OwnerDashboardPage() {
                   zipcode: data.company.zipcode || '',
                   logo_url: data.company.logo_url || null,
                   show_address_on_invoice: data.company.show_address_on_invoice ?? true,
+                })
+
+                // Load payment preferences
+                setPaymentPreferences({
+                  paypal_handle: data.company.paypal_handle || '',
+                  zelle_phone: data.company.zelle_phone || '',
+                  zelle_email: data.company.zelle_email || '',
+                  check_payable_to: data.company.check_payable_to || '',
+                  accept_cash: data.company.accept_cash || false,
+                  accept_credit_debit: data.company.accept_credit_debit || false,
+                  late_fee_enabled: data.company.late_fee_enabled || false,
+                  late_fee_days: data.company.late_fee_days || 30,
+                  late_fee_amount: Number(data.company.late_fee_amount ?? 25),
                 })
               }
 
@@ -321,6 +351,91 @@ export default function OwnerDashboardPage() {
       setError(err instanceof Error ? err.message : 'Failed to upload logo')
     } finally {
       setUploadingLogo(false)
+    }
+  }
+
+  const handleSavePaymentPreferences = async () => {
+    setSavingPayment(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch('/api/company/payment-preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentPreferences),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update payment preferences')
+      }
+
+      const data = await response.json()
+
+      // Update companies state with the new payment preferences
+      if (data.company) {
+        setCompanies(prev =>
+          prev.map(c => c.id === data.company.id ? data.company : c)
+        )
+
+        setPaymentPreferences({
+          paypal_handle: data.company.paypal_handle || '',
+          zelle_phone: data.company.zelle_phone || '',
+          zelle_email: data.company.zelle_email || '',
+          check_payable_to: data.company.check_payable_to || '',
+          accept_cash: data.company.accept_cash || false,
+          accept_credit_debit: data.company.accept_credit_debit || false,
+          late_fee_enabled: data.company.late_fee_enabled || false,
+          late_fee_days: Number(data.company.late_fee_days ?? 30),
+          late_fee_amount: Number(data.company.late_fee_amount ?? 25),
+        })
+      }
+
+      setSuccess('Payment preferences updated successfully!')
+      setPaymentEditMode(false)
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to update payment preferences')
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
+  const handleApplyLateFees = async () => {
+    setApplyingLateFees(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch('/api/invoices/late-fees', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      const result: {
+        invoicesChecked?: number
+        invoicesUpdated?: number
+        feesCreated?: number
+        skippedReason?: string
+        error?: string
+      } = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to apply late fees')
+      }
+
+      if (result.feesCreated && result.feesCreated > 0) {
+        setSuccess(`Applied ${result.feesCreated} late fee lines across ${result.invoicesUpdated ?? 0} invoices.`)
+      } else {
+        setSuccess(result.skippedReason || 'No late fees were added.')
+      }
+
+      setTimeout(() => setSuccess(null), 3000)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to apply late fees')
+    } finally {
+      setApplyingLateFees(false)
     }
   }
 
@@ -930,6 +1045,295 @@ export default function OwnerDashboardPage() {
                   </Button>
                 </div>
               </>
+            )}
+          </div>
+
+          {/* Payment Preferences Section */}
+          <div className="glass-surface shadow-lg rounded-lg p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CreditCard className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-semibold">Payment Preferences</h2>
+              </div>
+              {!paymentEditMode && (
+                <Button
+                  onClick={() => setPaymentEditMode(true)}
+                  variant="outline"
+                  size="sm"
+                >
+                  <Edit2 className="h-4 w-4 mr-2" />
+                  Edit
+                </Button>
+              )}
+              {paymentEditMode && (
+                <Button
+                  onClick={() => {
+                    setPaymentEditMode(false)
+                    const currentCompany = companies[0]
+                    if (!currentCompany) return
+                    setPaymentPreferences({
+                      paypal_handle: currentCompany.paypal_handle || '',
+                      zelle_phone: currentCompany.zelle_phone || '',
+                      zelle_email: currentCompany.zelle_email || '',
+                      check_payable_to: currentCompany.check_payable_to || '',
+                      accept_cash: currentCompany.accept_cash || false,
+                      accept_credit_debit: currentCompany.accept_credit_debit || false,
+                      late_fee_enabled: currentCompany.late_fee_enabled || false,
+                      late_fee_days: Number(currentCompany.late_fee_days ?? 30),
+                      late_fee_amount: Number(currentCompany.late_fee_amount ?? 25),
+                    })
+                  }}
+                  variant="ghost"
+                  size="sm"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancel
+                </Button>
+              )}
+            </div>
+
+            {!paymentEditMode ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">PayPal Handle</label>
+                    <p className="mt-1 text-base">
+                      {paymentPreferences.paypal_handle ? `@${paymentPreferences.paypal_handle}` : <span className="text-muted-foreground">Not set</span>}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Zelle Phone</label>
+                    <p className="mt-1 text-base">
+                      {paymentPreferences.zelle_phone || <span className="text-muted-foreground">Not set</span>}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Zelle Email</label>
+                    <p className="mt-1 text-base">
+                      {paymentPreferences.zelle_email || <span className="text-muted-foreground">Not set</span>}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium text-muted-foreground">Check Payable To</label>
+                    <p className="mt-1 text-base">
+                      {paymentPreferences.check_payable_to || <span className="text-muted-foreground">Not set</span>}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-semibold mb-3">Payment Methods Accepted</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${paymentPreferences.accept_cash ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className="text-sm">Cash {paymentPreferences.accept_cash ? '✓' : '✗'}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${paymentPreferences.accept_credit_debit ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className="text-sm">Credit/Debit Cards {paymentPreferences.accept_credit_debit ? '✓' : '✗'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-semibold mb-3">Late Fee Policy</h4>
+                  {paymentPreferences.late_fee_enabled ? (
+                    <>
+                      <p className="text-sm text-muted-foreground">
+                        Late fees start the day after the invoice due date. An additional <strong className="text-foreground">${paymentPreferences.late_fee_amount.toFixed(2)}</strong> is applied every <strong className="text-foreground">{paymentPreferences.late_fee_days} days</strong> after the due date until paid.
+                      </p>
+                      <div className="mt-3">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleApplyLateFees}
+                          disabled={applyingLateFees}
+                        >
+                          {applyingLateFees ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Applying late fees...
+                            </>
+                          ) : (
+                            'Apply late fees to overdue invoices'
+                          )}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No late fee policy configured</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="paypal_handle">PayPal Handle</Label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-muted-foreground">@</span>
+                      <Input
+                        id="paypal_handle"
+                        placeholder="username"
+                        value={paymentPreferences.paypal_handle}
+                        onChange={(e) => setPaymentPreferences(prev => ({ ...prev, paypal_handle: e.target.value }))}
+                        className="mt-1 flex-1"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">Enter without @ symbol</p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="zelle_phone">Zelle Phone</Label>
+                    <Input
+                      id="zelle_phone"
+                      placeholder="(555) 123-4567"
+                      value={paymentPreferences.zelle_phone}
+                      onChange={(e) => setPaymentPreferences(prev => ({ ...prev, zelle_phone: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="zelle_email">Zelle Email</Label>
+                    <Input
+                      id="zelle_email"
+                      type="email"
+                      placeholder="email@example.com"
+                      value={paymentPreferences.zelle_email}
+                      onChange={(e) => setPaymentPreferences(prev => ({ ...prev, zelle_email: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="check_payable_to">Check Payable To</Label>
+                    <Input
+                      id="check_payable_to"
+                      placeholder="Company Name"
+                      value={paymentPreferences.check_payable_to}
+                      onChange={(e) => setPaymentPreferences(prev => ({ ...prev, check_payable_to: e.target.value }))}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Payment Methods Accepted */}
+                <div className="border-t pt-6">
+                  <h4 className="text-sm font-semibold mb-4">Payment Methods Accepted</h4>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="accept_cash">Accept Cash</Label>
+                        <p className="text-xs text-muted-foreground">Show cash as accepted payment method on invoices</p>
+                      </div>
+                      <Switch
+                        id="accept_cash"
+                        checked={paymentPreferences.accept_cash}
+                        onCheckedChange={(checked: boolean) => setPaymentPreferences(prev => ({ ...prev, accept_cash: checked }))}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="accept_credit_debit">Accept Credit/Debit Cards</Label>
+                        <p className="text-xs text-muted-foreground">Show credit/debit cards as accepted payment method on invoices</p>
+                      </div>
+                      <Switch
+                        id="accept_credit_debit"
+                        checked={paymentPreferences.accept_credit_debit}
+                        onCheckedChange={(checked: boolean) => setPaymentPreferences(prev => ({ ...prev, accept_credit_debit: checked }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Late Fee Policy */}
+                <div className="border-t pt-6">
+                  <h4 className="text-sm font-semibold mb-4">Late Fee Policy</h4>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="late_fee_enabled">Enable Late Fees</Label>
+                        <p className="text-xs text-muted-foreground">Apply late fees to overdue invoices</p>
+                      </div>
+                      <Switch
+                        id="late_fee_enabled"
+                        checked={paymentPreferences.late_fee_enabled}
+                        onCheckedChange={(checked: boolean) => setPaymentPreferences(prev => ({ ...prev, late_fee_enabled: checked }))}
+                      />
+                    </div>
+
+                    {paymentPreferences.late_fee_enabled && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-purple-500/30">
+                        <div>
+                          <Label htmlFor="late_fee_days">Late Fee Cadence (days after due date)</Label>
+                          <Input
+                            id="late_fee_days"
+                            type="number"
+                            min="1"
+                            placeholder="30"
+                            value={paymentPreferences.late_fee_days}
+                            onChange={(e) => setPaymentPreferences(prev => ({ ...prev, late_fee_days: parseInt(e.target.value) || 30 }))}
+                            className="mt-1"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">How often to apply the late fee after the invoice due date.</p>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="late_fee_amount">Late Fee Amount</Label>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted-foreground">$</span>
+                            <Input
+                              id="late_fee_amount"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              placeholder="25.00"
+                              value={paymentPreferences.late_fee_amount}
+                              onChange={(e) => setPaymentPreferences(prev => ({ ...prev, late_fee_amount: parseFloat(e.target.value) || 0 }))}
+                              className="mt-1 flex-1"
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">Fee charged on each cadence after the due date.</p>
+                        </div>
+
+                        {/* Live Preview */}
+                        <div className="md:col-span-2 bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                          <p className="text-xs font-semibold text-purple-300 mb-2">Preview on Invoice:</p>
+                          <p className="text-sm text-purple-100">
+                            Late fees start the day after the invoice due date. An additional <strong>${paymentPreferences.late_fee_amount.toFixed(2)}</strong> is applied every <strong>{paymentPreferences.late_fee_days} days</strong> after the due date until paid.
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Save Button for Payment Preferences */}
+                <div className="flex justify-end mt-6">
+                  <Button
+                    onClick={handleSavePaymentPreferences}
+                    disabled={savingPayment}
+                    size="lg"
+                  >
+                    {savingPayment ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4 mr-2" />
+                        Save Payment Preferences
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
 

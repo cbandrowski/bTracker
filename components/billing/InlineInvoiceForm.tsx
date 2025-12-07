@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, Eye } from 'lucide-react'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { InvoicePreview } from './InvoicePreview'
 
 interface UnpaidJob {
   id: string
@@ -64,11 +65,13 @@ interface InlineInvoiceFormProps {
   jobs: UnpaidJob[]
   deposits: UnappliedPayment[]
   companyInfo: CompanyInfo | null
+  customerId?: string
   onSubmit: (data: {
     jobIds: string[]
     lines: InvoiceLineInput[]
     depositIds: string[]
     terms: string
+    notes?: string | null
     issueNow: boolean
     dueDate?: string
   }) => Promise<void>
@@ -80,6 +83,7 @@ export function InlineInvoiceForm({
   jobs,
   deposits,
   companyInfo,
+  customerId,
   onSubmit,
   onCancel,
 }: InlineInvoiceFormProps) {
@@ -87,10 +91,23 @@ export function InlineInvoiceForm({
   const [selectedDepositIds, setSelectedDepositIds] = useState<Set<string>>(new Set())
   const [issueNow, setIssueNow] = useState(true)
   const [dueDate, setDueDate] = useState('')
+  const [notes, setNotes] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [taxRate, setTaxRate] = useState(0)
   const [taxRateInput, setTaxRateInput] = useState('')
+  const [showPreview, setShowPreview] = useState(false)
+  const [customerInfo, setCustomerInfo] = useState<any>(null)
+
+  // Fetch customer info for preview
+  useEffect(() => {
+    if (customerId) {
+      fetch(`/api/customers/${customerId}`)
+        .then(res => res.json())
+        .then(data => setCustomerInfo(data))
+        .catch(console.error)
+    }
+  }, [customerId])
 
   // Initialize invoice lines from selected jobs
   useEffect(() => {
@@ -214,6 +231,44 @@ export function InlineInvoiceForm({
 
   const canSubmit = hasContent && !depositsExceedTotal && !needsDueDate && !hasInvalidLines
 
+  const handlePreview = () => {
+    setShowPreview(true)
+  }
+
+  const handleConfirmCreate = async () => {
+    if (!canSubmit) return
+
+    setSubmitting(true)
+    setError(null)
+
+    try {
+      const jobIds = invoiceLines.filter(l => l.type === 'job').map(l => l.jobId!)
+      const lines: InvoiceLineInput[] = invoiceLines.map(line => ({
+        description: line.description,
+        quantity: line.quantity,
+        unitPrice: line.unitPrice,
+        taxRate: taxRate, // Apply the global tax rate to all lines
+        jobId: line.type === 'job' ? line.jobId : null,
+      }))
+
+      await onSubmit({
+        jobIds,
+        lines,
+        depositIds: Array.from(selectedDepositIds),
+        terms: 'Net 30', // Default terms since we removed the dropdown
+        notes: notes.trim() || null,
+        issueNow,
+        dueDate: dueDate || undefined,
+      })
+
+      setShowPreview(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create invoice')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleSubmit = async () => {
     if (!canSubmit) return
 
@@ -235,6 +290,7 @@ export function InlineInvoiceForm({
         lines,
         depositIds: Array.from(selectedDepositIds),
         terms: 'Net 30', // Default terms since we removed the dropdown
+        notes: notes.trim() || null,
         issueNow,
         dueDate: dueDate || undefined,
       })
@@ -437,8 +493,20 @@ export function InlineInvoiceForm({
           </div>
         )}
 
-        {/* Due Date */}
+        {/* Notes + Due Date */}
         <div className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="notes">Invoice Notes (optional)</Label>
+            <Textarea
+              id="notes"
+              placeholder="Add a note that will appear next to Bill To on the invoice"
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              rows={3}
+              className="text-sm"
+            />
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="dueDate">Due Date</Label>
             <Input
@@ -589,6 +657,15 @@ export function InlineInvoiceForm({
 
         {/* Action Buttons */}
         <div className="flex items-center gap-3 pt-4">
+          <Button
+            variant="outline"
+            onClick={handlePreview}
+            disabled={!canSubmit || submitting}
+            className="flex-1"
+          >
+            <Eye className="h-4 w-4 mr-2" />
+            Preview Invoice
+          </Button>
           <Button onClick={handleSubmit} disabled={!canSubmit || submitting} className="flex-1">
             {submitting ? 'Creating Invoice...' : 'Create Invoice'}
           </Button>
@@ -597,6 +674,29 @@ export function InlineInvoiceForm({
           </Button>
         </div>
       </CardContent>
+
+      {/* Invoice Preview Dialog */}
+      <InvoicePreview
+        open={showPreview}
+        onOpenChange={setShowPreview}
+        lines={invoiceLines.map(line => ({
+          description: line.description,
+          quantity: line.quantity,
+          unitPrice: line.unitPrice,
+          taxRate: taxRate,
+          jobId: line.type === 'job' ? line.jobId : null,
+          jobTitle: line.type === 'job' ? line.description : undefined,
+        }))}
+        deposits={deposits}
+        selectedDepositIds={Array.from(selectedDepositIds)}
+        companyInfo={companyInfo}
+        customerInfo={customerInfo}
+        dueDate={dueDate}
+        notes={notes.trim() || undefined}
+        onConfirm={handleConfirmCreate}
+        onCancel={() => setShowPreview(false)}
+        isSubmitting={submitting}
+      />
     </Card>
   )
 }
