@@ -30,6 +30,19 @@ export interface Company {
   phone: string | null
   email: string | null
   website: string | null
+  logo_url: string | null
+  show_address_on_invoice: boolean
+  // Payment preferences
+  paypal_handle: string | null
+  zelle_phone: string | null
+  zelle_email: string | null
+  check_payable_to: string | null
+  accept_cash: boolean
+  accept_credit_debit: boolean
+  // Late fee settings
+  late_fee_enabled: boolean
+  late_fee_days: number
+  late_fee_amount: number
   created_at: string
   updated_at: string
 }

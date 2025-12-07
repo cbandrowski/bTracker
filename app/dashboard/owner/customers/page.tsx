@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
 import { Customer } from '@/types/database'
-import AddressAutocomplete from '@/components/AddressAutocomplete'
+import AddressAutocomplete, { ParsedAddress } from '@/components/AddressAutocomplete'
 import { useRouter } from 'next/navigation'
 import { customersService, companiesService } from '@/lib/services'
 import { getCustomersWithBilling, CustomerWithBilling } from '@/app/actions/customers'
@@ -119,32 +119,46 @@ export default function CustomersPage() {
     }))
   }
 
-  const handleBillingAddressSelect = (addressData: any) => {
+  const handleBillingAddressSelect = (address: ParsedAddress) => {
+    console.log('🏠 Billing address parsed from Google:', address)
+    const {
+      address: streetAddress,
+      addressLine2,
+      city,
+      state,
+      zipcode,
+      country,
+    } = address
+
     setFormData(prev => ({
       ...prev,
-      billing_address: addressData.address,
-      billing_city: addressData.city,
-      billing_state: addressData.state,
-      billing_zipcode: addressData.zipcode,
-      billing_country: addressData.country || 'USA',
+      billing_address: streetAddress,
+      billing_address_line_2: addressLine2 || prev.billing_address_line_2,
+      billing_city: city,
+      billing_state: state,
+      billing_zipcode: zipcode,
+      billing_country: country,
       ...(prev.same_as_billing ? {
-        service_address: addressData.address,
-        service_city: addressData.city,
-        service_state: addressData.state,
-        service_zipcode: addressData.zipcode,
-        service_country: addressData.country || 'USA'
+        service_address: streetAddress,
+        service_address_line_2: addressLine2 || prev.service_address_line_2,
+        service_city: city,
+        service_state: state,
+        service_zipcode: zipcode,
+        service_country: country
       } : {})
     }))
   }
 
-  const handleServiceAddressSelect = (addressData: any) => {
+  const handleServiceAddressSelect = (address: ParsedAddress) => {
+    console.log('🏠 Service address parsed from Google:', address)
     setFormData(prev => ({
       ...prev,
-      service_address: addressData.address,
-      service_city: addressData.city,
-      service_state: addressData.state,
-      service_zipcode: addressData.zipcode,
-      service_country: addressData.country || 'USA'
+      service_address: address.address,
+      service_address_line_2: address.addressLine2 || prev.service_address_line_2,
+      service_city: address.city,
+      service_state: address.state,
+      service_zipcode: address.zipcode,
+      service_country: address.country
     }))
   }
 
@@ -246,9 +260,14 @@ export default function CustomersPage() {
       same_as_billing: fullCustomer.same_as_billing,
       notes: fullCustomer.notes || ''
     })
-    setShowForm(true)
-    // Scroll to form
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+    setShowForm(false) // Don't show the top form
+    // Scroll to the customer row after a brief delay to let the edit form render
+    setTimeout(() => {
+      const element = document.getElementById(`customer-${fullCustomer.id}`)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
   }
 
   const handleCancelEdit = () => {
@@ -571,6 +590,16 @@ export default function CustomersPage() {
             onAddPayment={handleAddPayment}
             onEditCustomer={handleEditCustomer}
             onCreateRecurringJob={handleCreateRecurringJob}
+            editingCustomer={editingCustomer}
+            formData={formData}
+            onFormChange={setFormData}
+            onSubmit={handleSubmit}
+            onCancelEdit={handleCancelEdit}
+            submitting={submitting}
+            onBillingAddressSelect={handleBillingAddressSelect}
+            onServiceAddressSelect={handleServiceAddressSelect}
+            onSameAsBillingToggle={handleSameAsBillingToggle}
+            onInputChange={handleInputChange}
           />
         )}
       </div>

@@ -28,6 +28,7 @@ const MIN_MINUTES_PER_BLOCK = 30
 export default function SchedulePage() {
   const { profile } = useAuth()
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([])
+  const [unassignedJobs, setUnassignedJobs] = useState<Array<Job & { customer?: { name: string } }>>([])
   const [employees, setEmployees] = useState<Array<{ id: string; full_name: string }>>([])
   const [loading, setLoading] = useState(true)
   const [companyId, setCompanyId] = useState<string | null>(null)
@@ -39,18 +40,6 @@ export default function SchedulePage() {
   const [employeeFilter, setEmployeeFilter] = useState<string>('all')
   const [selectedAssignment, setSelectedAssignment] = useState<AssignmentWithDetails | null>(null)
   const [showMonthPicker, setShowMonthPicker] = useState(false)
-
-  // Recurring shift creation states
-  const [showRecurringDialog, setShowRecurringDialog] = useState(false)
-  const [recurringEmployee, setRecurringEmployee] = useState<string>('')
-  const [recurringStartTime, setRecurringStartTime] = useState('09:00')
-  const [recurringEndTime, setRecurringEndTime] = useState('17:00')
-  const [recurringDays, setRecurringDays] = useState<number[]>([]) // 0=Sun, 1=Mon, etc.
-  const [recurringDuration, setRecurringDuration] = useState<'1week' | '2weeks' | '3weeks' | '4weeks' | 'month'>('1week')
-  const [recurringStartDate, setRecurringStartDate] = useState(new Date().toISOString().split('T')[0])
-  const [recurringSameHours, setRecurringSameHours] = useState(true)
-  const [recurringDayHours, setRecurringDayHours] = useState<Record<number, { start: string; end: string }>>({})
-  const [isCreatingRecurring, setIsCreatingRecurring] = useState(false)
 
   useEffect(() => {
     const fetchData = async () => {
@@ -114,7 +103,42 @@ export default function SchedulePage() {
         if (error) {
           console.error('Error fetching assignments:', error)
         } else {
+          console.log('Fetched assignments:', assignmentsData)
+          console.log('Number of assignments:', assignmentsData?.length || 0)
+          // Log each assignment's dates
+          assignmentsData?.forEach((assignment: any) => {
+            const effectiveDate = assignment.service_start_at || assignment.job?.planned_end_date
+            console.log(`Assignment ${assignment.id}:`, {
+              job_title: assignment.job?.title,
+              service_start_at: assignment.service_start_at,
+              service_end_at: assignment.service_end_at,
+              job_planned_end_date: assignment.job?.planned_end_date,
+              effective_date_used: effectiveDate,
+              effective_date_parsed: effectiveDate ? new Date(effectiveDate).toDateString() : null
+            })
+          })
           setAssignments((assignmentsData as any) || [])
+        }
+
+        // Fetch unassigned jobs (jobs without any assignments)
+        const { data: allJobs } = await supabase
+          .from('jobs')
+          .select(`
+            *,
+            customer:customers(name)
+          `)
+          .eq('company_id', ownerData.company_id)
+          .neq('status', 'done')
+          .order('planned_end_date', { ascending: true })
+
+        if (allJobs) {
+          // Get list of job IDs that have assignments
+          const assignedJobIds = new Set(assignmentsData?.map((a: any) => a.job_id) || [])
+
+          // Filter to only unassigned jobs
+          const unassigned = allJobs.filter(job => !assignedJobIds.has(job.id))
+          console.log('Unassigned jobs:', unassigned.length)
+          setUnassignedJobs(unassigned as any)
         }
       } catch (error) {
         console.error('Error:', error)
@@ -130,7 +154,12 @@ export default function SchedulePage() {
 
   // Filter assignments based on status and employee
   const filteredAssignments = useMemo(() => {
-    return assignments.filter(assignment => {
+    // If showing unassigned jobs, return empty array (we'll handle unassigned separately)
+    if (employeeFilter === 'unassigned') {
+      return []
+    }
+
+    const filtered = assignments.filter(assignment => {
       // Status filter
       if (statusFilter !== 'all') {
         if (statusFilter === 'upcoming' && assignment.assignment_status !== 'assigned') return false
@@ -143,6 +172,9 @@ export default function SchedulePage() {
 
       return true
     })
+    console.log('Filtered assignments:', filtered)
+    console.log('Total assignments:', assignments.length, 'Filtered:', filtered.length)
+    return filtered
   }, [assignments, statusFilter, employeeFilter])
 
   // Get calendar data based on view mode
@@ -156,10 +188,6 @@ export default function SchedulePage() {
 
     const startOfMonth = (date: Date) => {
       return new Date(date.getFullYear(), date.getMonth(), 1)
-    }
-
-    const endOfMonth = (date: Date) => {
-      return new Date(date.getFullYear(), date.getMonth() + 1, 0)
     }
 
     if (viewMode === 'day') {
@@ -177,7 +205,6 @@ export default function SchedulePage() {
     } else {
       // Month view
       const start = startOfMonth(currentDate)
-      const end = endOfMonth(currentDate)
       const firstDayOfWeek = start.getDay()
 
       // Start from the Sunday before the first of the month
@@ -204,17 +231,87 @@ export default function SchedulePage() {
     const dayEnd = new Date(day)
     dayEnd.setHours(23, 59, 59, 999)
 
-    return filteredAssignments
+    console.log(`Checking assignments for ${day.toDateString()} (${dayStart.toISOString()} to ${dayEnd.toISOString()})`)
+
+    // If showing unassigned jobs
+    if (employeeFilter === 'unassigned') {
+      const unassignedForDay = unassignedJobs
+        .filter(job => {
+          if (!job.planned_end_date) {
+            console.log('  ❌ Unassigned job without planned_end_date:', job.title)
+            return false
+          }
+          // Parse date as local date to avoid timezone issues
+          const [year, month, day] = job.planned_end_date.split('-').map(Number)
+          const dateToCheck = new Date(year, month - 1, day)
+          const inRange = dateToCheck >= dayStart && dateToCheck <= dayEnd
+          console.log(`  ${inRange ? '✅' : '⏭️'} Unassigned: ${job.title}: ${dateToCheck.toDateString()} (planned: ${job.planned_end_date}) - inRange: ${inRange}`)
+          return inRange
+        })
+        .sort((a, b) => {
+          const timeA = a.planned_end_date ? new Date(a.planned_end_date).getTime() : 0
+          const timeB = b.planned_end_date ? new Date(b.planned_end_date).getTime() : 0
+          return timeA - timeB
+        })
+        // Convert to assignment-like format for display
+        .map(job => ({
+          id: job.id,
+          job_id: job.id,
+          company_id: job.company_id,
+          employee_id: '',
+          service_start_at: null,
+          service_end_at: null,
+          assignment_status: 'assigned' as AssignmentStatus,
+          worker_confirmed_done_at: null,
+          notes: null,
+          created_at: job.created_at,
+          updated_at: job.updated_at,
+          job: job,
+          employee: undefined
+        } as AssignmentWithDetails))
+
+      console.log(`Unassigned jobs for ${day.toDateString()}:`, unassignedForDay.length)
+      return unassignedForDay
+    }
+
+    const dayAssignments = filteredAssignments
       .filter(assignment => {
-        if (!assignment.service_start_at) return false
-        const startDate = new Date(assignment.service_start_at)
-        return startDate >= dayStart && startDate <= dayEnd
+        // Check both service_start_at and job's planned_end_date
+        let dateToCheck: Date | null = null
+        let dateSource = ''
+
+        if (assignment.service_start_at) {
+          dateToCheck = new Date(assignment.service_start_at)
+          dateSource = 'service_start_at'
+        } else if (assignment.job?.planned_end_date) {
+          // Use job's planned_end_date as fallback - parse as local date to avoid timezone issues
+          const [year, month, day] = assignment.job.planned_end_date.split('-').map(Number)
+          dateToCheck = new Date(year, month - 1, day)
+          dateSource = 'planned_end_date'
+        }
+
+        if (!dateToCheck) {
+          console.log('  ❌ Assignment without any date:', assignment.job?.title)
+          return false
+        }
+
+        const inRange = dateToCheck >= dayStart && dateToCheck <= dayEnd
+        console.log(`  ${inRange ? '✅' : '⏭️'} ${assignment.job?.title}: ${dateToCheck.toDateString()} (${dateSource}) - inRange: ${inRange}`)
+        return inRange
       })
       .sort((a, b) => {
-        const timeA = new Date(a.service_start_at!).getTime()
-        const timeB = new Date(b.service_start_at!).getTime()
+        // Sort by service_start_at if available, otherwise by planned_end_date
+        const timeA = a.service_start_at
+          ? new Date(a.service_start_at).getTime()
+          : (a.job?.planned_end_date ? new Date(a.job.planned_end_date).getTime() : 0)
+        const timeB = b.service_start_at
+          ? new Date(b.service_start_at).getTime()
+          : (b.job?.planned_end_date ? new Date(b.job.planned_end_date).getTime() : 0)
         return timeA - timeB
       })
+
+    console.log(`Assignments for ${day.toDateString()}:`, dayAssignments.length)
+    return dayAssignments
   }
 
   // Navigation functions
@@ -251,9 +348,10 @@ export default function SchedulePage() {
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   }
 
-  const formatTimeRange = (startString: string | null, endString: string | null) => {
-    if (!startString) return 'No time set'
-    const start = formatTime(startString)
+  const formatTimeRange = (startString: string | null, endString: string | null, fallbackDate?: string | null) => {
+    if (!startString && !fallbackDate) return 'No time set'
+    if (!startString && fallbackDate) return 'All day'
+    const start = formatTime(startString!)
     if (!endString) return start
     const end = formatTime(endString)
     return `${start} - ${end}`
@@ -321,111 +419,6 @@ export default function SchedulePage() {
     }
   }
 
-  const handleCreateRecurringShifts = async () => {
-    if (!recurringEmployee || recurringDays.length === 0) {
-      alert('Please select an employee and at least one day of the week')
-      return
-    }
-
-    if (!recurringSameHours) {
-      const invalidDay = recurringDays.find((day) => {
-        const config = recurringDayHours[day]
-        const start = config?.start || recurringStartTime
-        const end = config?.end || recurringEndTime
-        if (!start || !end) return true
-        return end <= start
-      })
-
-      if (invalidDay !== undefined) {
-        alert('Please provide valid start/end times for each selected day (end must be after start).')
-        return
-      }
-    }
-
-    setIsCreatingRecurring(true)
-
-    try {
-      const dayHoursPayload = recurringSameHours
-        ? undefined
-        : recurringDays.map((day) => {
-            const override = recurringDayHours[day]
-            return {
-              day_of_week: day,
-              start_time: override?.start || recurringStartTime,
-              end_time: override?.end || recurringEndTime,
-            }
-          })
-
-      const response = await fetch('/api/schedule/recurring', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          employee_id: recurringEmployee,
-          start_time: recurringStartTime,
-          end_time: recurringEndTime,
-          days_of_week: recurringDays,
-          duration: recurringDuration,
-          start_date: recurringStartDate,
-          company_id: companyId,
-          day_hours: dayHoursPayload,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create recurring shifts')
-      }
-
-      const data = await response.json()
-      alert(`Successfully created ${data.count} shifts!`)
-
-      setShowRecurringDialog(false)
-      setRecurringEmployee('')
-      setRecurringDays([])
-      setRecurringStartTime('09:00')
-      setRecurringEndTime('17:00')
-      setRecurringDuration('1week')
-      setRecurringSameHours(true)
-      setRecurringDayHours({})
-
-      // Reload assignments
-      window.location.reload()
-    } catch (error) {
-      console.error('Error creating recurring shifts:', error)
-      alert(error instanceof Error ? error.message : 'Failed to create recurring shifts')
-    } finally {
-      setIsCreatingRecurring(false)
-    }
-  }
-
-  const toggleRecurringDay = (day: number) => {
-    setRecurringDays(prev => {
-      const nextDays = prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort()
-      if (!recurringSameHours) {
-        setRecurringDayHours((current) => {
-          const copy = { ...current }
-          if (nextDays.includes(day)) {
-            copy[day] = copy[day] || { start: recurringStartTime, end: recurringEndTime }
-          } else {
-            delete copy[day]
-          }
-          return copy
-        })
-      }
-      return nextDays
-    })
-  }
-
-  const updateDayHours = (day: number, field: 'start' | 'end', value: string) => {
-    setRecurringDayHours((prev) => ({
-      ...prev,
-      [day]: {
-        start: field === 'start' ? value : prev[day]?.start || recurringStartTime,
-        end: field === 'end' ? value : prev[day]?.end || recurringEndTime,
-      }
-    }))
-  }
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -441,12 +434,6 @@ export default function SchedulePage() {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
             <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-400">Quest Schedule</h2>
-            <button
-              onClick={() => setShowRecurringDialog(true)}
-              className="mt-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all text-sm font-medium shadow-lg"
-            >
-              + Create Recurring Shifts
-            </button>
           </div>
 
           {/* Filters */}
@@ -458,6 +445,7 @@ export default function SchedulePage() {
               className="px-4 py-2 bg-slate-800/50 text-purple-200 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
             >
               <option value="all">All Warriors</option>
+              <option value="unassigned">🔍 Unassigned Jobs ({unassignedJobs.length})</option>
               {employees.map(emp => (
                 <option key={emp.id} value={emp.id}>{emp.full_name}</option>
               ))}
@@ -672,18 +660,29 @@ export default function SchedulePage() {
                   </div>
                 )}
                 {dayAssignments.map(assignment => {
-                  if (!assignment.service_start_at) return null
-                  const startMinutes = Math.max(0, Math.min(minutesSinceStartOfDay(assignment.service_start_at), HOURS_IN_DAY * 60))
-                  const endMinutesRaw = assignment.service_end_at ? minutesSinceStartOfDay(assignment.service_end_at) : startMinutes + 60
-                  const endMinutes = Math.max(startMinutes + MIN_MINUTES_PER_BLOCK, Math.min(endMinutesRaw, HOURS_IN_DAY * 60))
-                  const durationMinutes = Math.max(MIN_MINUTES_PER_BLOCK, endMinutes - startMinutes)
-                  const top = startMinutes * minuteHeight
-                  const height = durationMinutes * minuteHeight
+                  // If no service_start_at but has planned_end_date, show as all-day at top
+                  const hasServiceTime = !!assignment.service_start_at
+
+                  let top = 0
+                  let height = 0
+
+                  if (hasServiceTime) {
+                    const startMinutes = Math.max(0, Math.min(minutesSinceStartOfDay(assignment.service_start_at!), HOURS_IN_DAY * 60))
+                    const endMinutesRaw = assignment.service_end_at ? minutesSinceStartOfDay(assignment.service_end_at) : startMinutes + 60
+                    const endMinutes = Math.max(startMinutes + MIN_MINUTES_PER_BLOCK, Math.min(endMinutesRaw, HOURS_IN_DAY * 60))
+                    const durationMinutes = Math.max(MIN_MINUTES_PER_BLOCK, endMinutes - startMinutes)
+                    top = startMinutes * minuteHeight
+                    height = durationMinutes * minuteHeight
+                  } else {
+                    // All-day event - show at top with fixed height
+                    top = 0
+                    height = HOUR_BLOCK_HEIGHT
+                  }
 
                   return (
                     <div
                       key={assignment.id}
-                      className={`absolute left-4 right-4 p-3 rounded-lg border shadow-sm cursor-pointer transition-all hover:ring-2 hover:ring-primary ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-primary' : ''}`}
+                      className={`absolute left-4 right-4 p-3 rounded-lg border shadow-sm cursor-pointer transition-all hover:ring-2 hover:ring-primary ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-primary' : ''} ${!hasServiceTime ? 'opacity-80' : ''}`}
                       style={{ top: `${top}px`, height: `${height}px` }}
                       onClick={(event) => {
                         event.stopPropagation()
@@ -691,7 +690,7 @@ export default function SchedulePage() {
                       }}
                     >
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {assignment.employee?.profile?.full_name || 'Unassigned'}
+                        {assignment.employee?.profile?.full_name || '🔍 Unassigned'}
                       </div>
                       <div className="text-lg font-bold text-foreground truncate">
                         {assignment.job?.title || 'Untitled Job'}
@@ -700,7 +699,7 @@ export default function SchedulePage() {
                         {assignment.job?.customer?.name || 'No customer'}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {formatTimeRange(assignment.service_start_at, assignment.service_end_at)}
+                        {formatTimeRange(assignment.service_start_at, assignment.service_end_at, assignment.job?.planned_end_date)}
                       </div>
                       <div className="mt-2">
                         <span className="text-xs px-2 py-0.5 rounded glass-surface border border-border">
@@ -768,13 +767,13 @@ export default function SchedulePage() {
                         }}
                       >
                         <div className="font-semibold truncate">
-                          {assignment.service_start_at && formatTime(assignment.service_start_at)}
+                          {assignment.service_start_at ? formatTime(assignment.service_start_at) : 'All day'}
                         </div>
                         <div className="truncate">{assignment.job?.title || 'Untitled Job'}</div>
                         {viewMode === 'week' && (
                           <>
                             <div className="truncate text-muted-foreground">
-                              {assignment.employee?.profile?.full_name || 'Unknown'}
+                              {assignment.employee?.profile?.full_name || '🔍 Unassigned'}
                             </div>
                             <div className="truncate text-muted-foreground">
                               {assignment.job?.customer?.name || 'No customer'}
@@ -967,244 +966,6 @@ export default function SchedulePage() {
           </div>
         </div>
       </div>
-
-      {/* Recurring Shifts Creation Dialog */}
-      {showRecurringDialog && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl border border-purple-500/30 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-gray-700">
-              <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-400">
-                Create Recurring Shifts
-              </h3>
-              <p className="text-gray-400 text-sm mt-1">Set up repeating shifts for your team</p>
-            </div>
-
-            <div className="p-6 space-y-6">
-              {/* Employee Selection */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Employee *</label>
-                <select
-                  value={recurringEmployee}
-                  onChange={(e) => setRecurringEmployee(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="">Select Employee</option>
-                  {employees.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.full_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Start Date */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Start Date *</label>
-                <input
-                  type="date"
-                  value={recurringStartDate}
-                  onChange={(e) => setRecurringStartDate(e.target.value)}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-
-              {/* Time Range */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Start Time *</label>
-                  <input
-                    type="time"
-                    value={recurringStartTime}
-                    onChange={(e) => setRecurringStartTime(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">End Time *</label>
-                  <input
-                    type="time"
-                    value={recurringEndTime}
-                    onChange={(e) => setRecurringEndTime(e.target.value)}
-                    className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              </div>
-
-              {/* Hours mode */}
-              <div className="flex items-center gap-3">
-                <label className="text-sm text-gray-300 font-medium">Use same hours for all selected days</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !recurringSameHours
-                    setRecurringSameHours(next)
-                    if (next) {
-                      setRecurringDayHours({})
-                    } else {
-                      setRecurringDayHours((prev) => {
-                        const nextMap: Record<number, { start: string; end: string }> = {}
-                        recurringDays.forEach((day) => {
-                          nextMap[day] = prev[day] || { start: recurringStartTime, end: recurringEndTime }
-                        })
-                        return nextMap
-                      })
-                    }
-                  }}
-                  className={`px-3 py-1 rounded-md text-sm font-semibold ${
-                    recurringSameHours
-                      ? 'bg-purple-700 text-white'
-                      : 'bg-gray-700 text-gray-200'
-                  }`}
-                >
-                  {recurringSameHours ? 'Same Hours' : 'Custom Per Day'}
-                </button>
-              </div>
-
-              {/* Days of Week */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-3">Days of Week *</label>
-                <div className="flex gap-2 flex-wrap">
-                  {[
-                    { day: 0, label: 'S', full: 'Sunday' },
-                    { day: 1, label: 'M', full: 'Monday' },
-                    { day: 2, label: 'T', full: 'Tuesday' },
-                    { day: 3, label: 'W', full: 'Wednesday' },
-                    { day: 4, label: 'T', full: 'Thursday' },
-                    { day: 5, label: 'F', full: 'Friday' },
-                    { day: 6, label: 'S', full: 'Saturday' },
-                  ].map(({ day, label, full }) => (
-                    <button
-                      key={day}
-                      onClick={() => toggleRecurringDay(day)}
-                      className={`w-12 h-12 rounded-lg font-bold transition-all ${
-                        recurringDays.includes(day)
-                          ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg scale-105'
-                          : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-                      }`}
-                      title={full}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-gray-500 mt-2">Click to toggle days</p>
-              </div>
-
-              {/* Per-day hours */}
-              {!recurringSameHours && recurringDays.length > 0 && (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-300 font-medium">Set hours for each selected day</div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRecurringDayHours((prev) => {
-                          const next: Record<number, { start: string; end: string }> = {}
-                          recurringDays.forEach((day) => {
-                            next[day] = prev[day] || { start: recurringStartTime, end: recurringEndTime }
-                          })
-                          return next
-                        })
-                      }}
-                      className="text-xs px-3 py-1 rounded-md bg-gray-700 text-gray-100 hover:bg-gray-600"
-                    >
-                      Fill all with first time
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {recurringDays.map((day) => {
-                      const config = recurringDayHours[day] || { start: recurringStartTime, end: recurringEndTime }
-                      return (
-                        <div key={day} className="bg-gray-900 border border-gray-700 rounded-lg p-3">
-                          <div className="text-sm text-gray-200 font-semibold mb-2">
-                            {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day]}
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="time"
-                              value={config.start}
-                              onChange={(e) => updateDayHours(day, 'start', e.target.value)}
-                              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:ring-2 focus:ring-purple-500"
-                            />
-                            <input
-                              type="time"
-                              value={config.end}
-                              onChange={(e) => updateDayHours(day, 'end', e.target.value)}
-                              className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded text-white focus:ring-2 focus:ring-purple-500"
-                            />
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Duration */}
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">Repeat For *</label>
-                <select
-                  value={recurringDuration}
-                  onChange={(e) => setRecurringDuration(e.target.value as any)}
-                  className="w-full px-4 py-2 bg-gray-900 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="1week">Next 1 Week</option>
-                  <option value="2weeks">Next 2 Weeks</option>
-                  <option value="3weeks">Next 3 Weeks</option>
-                  <option value="4weeks">Next 4 Weeks</option>
-                  <option value="month">Rest of Month</option>
-                </select>
-              </div>
-
-              {/* Summary */}
-              {recurringEmployee && recurringDays.length > 0 && (
-                <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-4">
-                  <p className="text-sm text-purple-200">
-                    <strong>Preview:</strong> Creating shifts for{' '}
-                    <strong>{employees.find(e => e.id === recurringEmployee)?.full_name}</strong>
-                    {' '}on{' '}
-                    <strong>{recurringDays.map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ')}</strong>
-                    {' '}{
-                      recurringSameHours
-                        ? <>from <strong>{recurringStartTime}</strong> to <strong>{recurringEndTime}</strong></>
-                        : 'with custom hours per selected day'
-                    }
-                    {' '}for <strong>{recurringDuration.replace('weeks', ' weeks').replace('week', ' week').replace('month', ' the rest of the month')}</strong>
-                  </p>
-                  {!recurringSameHours && (
-                    <div className="mt-2 text-xs text-purple-100 space-y-1">
-                      {recurringDays.map((day) => {
-                        const config = recurringDayHours[day] || { start: recurringStartTime, end: recurringEndTime }
-                        return (
-                          <div key={day} className="flex justify-between">
-                            <span>{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day]}</span>
-                            <span>{config.start} - {config.end}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="p-6 border-t border-gray-700 flex justify-end gap-3">
-              <button
-                onClick={() => setShowRecurringDialog(false)}
-                disabled={isCreatingRecurring}
-                className="px-6 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateRecurringShifts}
-                disabled={isCreatingRecurring || !recurringEmployee || recurringDays.length === 0}
-                className="px-6 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-              >
-                {isCreatingRecurring ? 'Creating...' : 'Create Shifts'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

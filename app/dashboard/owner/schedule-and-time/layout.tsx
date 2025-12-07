@@ -12,10 +12,10 @@ export default function ScheduleAndTimeLayout({ children }: { children: React.Re
   const pathname = usePathname()
 
   // Determine current tab from pathname
-  const currentTab = pathname.split('/').pop() || 'schedule'
+  const currentTab = pathname.split('/').pop() || 'schedule-shifts'
 
   const tabs = [
-    { id: 'schedule', label: 'Schedule', href: '/dashboard/owner/schedule-and-time/schedule' },
+    { id: 'schedule-shifts', label: 'Schedule', href: '/dashboard/owner/schedule-and-time/schedule-shifts' },
     { id: 'approvals', label: 'Approvals', href: '/dashboard/owner/schedule-and-time/approvals' },
     { id: 'time-entries', label: 'Time Entries', href: '/dashboard/owner/schedule-and-time/time-entries' },
   ]

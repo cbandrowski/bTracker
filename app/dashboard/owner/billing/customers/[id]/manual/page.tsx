@@ -19,6 +19,7 @@ export default function ManualInvoicePage({ params }: PageProps) {
   const { toast } = useToast()
 
   const [customerName, setCustomerName] = useState<string>('')
+  const [companyInfo, setCompanyInfo] = useState<any>(null)
   const { data: depositsResponse, loading: depositsLoading } = useUnappliedPayments(customerId)
   const { createInvoice, loading: creatingInvoice } = useCreateInvoice()
 
@@ -37,6 +38,24 @@ export default function ManualInvoicePage({ params }: PageProps) {
     }
     fetchCustomer()
   }, [customerId])
+
+  // Fetch company info for invoice preview
+  useEffect(() => {
+    const fetchCompanyInfo = async () => {
+      try {
+        const response = await fetch('/api/companies')
+        if (response.ok) {
+          const data = await response.json()
+          if (Array.isArray(data) && data.length > 0) {
+            setCompanyInfo(data[0])
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching company info:', error)
+      }
+    }
+    fetchCompanyInfo()
+  }, [])
 
   const deposits = useMemo(() => depositsResponse?.items || [], [depositsResponse])
 
@@ -105,7 +124,8 @@ export default function ManualInvoicePage({ params }: PageProps) {
         selectedJobIds={[]}
         jobs={[]}
         deposits={deposits}
-        companyInfo={null}
+        companyInfo={companyInfo}
+        customerId={customerId}
         onSubmit={handleSubmit}
         onCancel={handleCancel}
         key={`${customerId}-${creatingInvoice}`}

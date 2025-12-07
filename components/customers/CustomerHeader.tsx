@@ -3,16 +3,15 @@
 import { Customer } from '@/types/customer-details'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Plus, FileText, CreditCard, Edit } from 'lucide-react'
+import { ArrowLeft, Plus, FileText, CreditCard } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 interface CustomerHeaderProps {
   customer: Customer
-  onEditClick?: () => void
 }
 
-export function CustomerHeader({ customer, onEditClick }: CustomerHeaderProps) {
+export function CustomerHeader({ customer }: CustomerHeaderProps) {
   const router = useRouter()
   const [isActive] = useState(true) // TODO: Add customer status to schema if needed
 
@@ -96,15 +95,6 @@ export function CustomerHeader({ customer, onEditClick }: CustomerHeaderProps) {
           >
             <CreditCard className="h-4 w-4 mr-1" />
             Add Payment
-          </Button>
-
-          <Button
-            variant="default"
-            size="sm"
-            onClick={onEditClick}
-          >
-            <Edit className="h-4 w-4 mr-1" />
-            Edit Customer
           </Button>
         </div>
       </div>

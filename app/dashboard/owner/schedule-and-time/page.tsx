@@ -12,7 +12,7 @@ export default function ScheduleAndTimePage() {
   const router = useRouter()
 
   useEffect(() => {
-    router.push('/dashboard/owner/schedule-and-time/schedule')
+    router.push('/dashboard/owner/schedule-and-time/schedule-shifts')
   }, [router])
 
   return (
