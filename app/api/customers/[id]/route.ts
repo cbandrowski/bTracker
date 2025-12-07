@@ -2,24 +2,36 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
 import { z } from 'zod'
 
+const emptyToNull = (val: unknown) => {
+  if (typeof val !== 'string') return val
+  const trimmed = val.trim()
+  return trimmed === '' ? null : trimmed
+}
+
+const emptyToUndefined = (val: unknown) => {
+  if (typeof val !== 'string') return val
+  const trimmed = val.trim()
+  return trimmed === '' ? undefined : trimmed
+}
+
 const updateCustomerSchema = z.object({
-  name: z.string().min(1).optional(),
-  phone: z.string().nullable().optional(),
-  email: z.string().email().nullable().optional(),
-  billing_address: z.string().nullable().optional(),
-  billing_address_line_2: z.string().nullable().optional(),
-  billing_city: z.string().nullable().optional(),
-  billing_state: z.string().nullable().optional(),
-  billing_zipcode: z.string().nullable().optional(),
-  billing_country: z.string().nullable().optional(),
-  service_address: z.string().nullable().optional(),
-  service_address_line_2: z.string().nullable().optional(),
-  service_city: z.string().nullable().optional(),
-  service_state: z.string().nullable().optional(),
-  service_zipcode: z.string().nullable().optional(),
-  service_country: z.string().nullable().optional(),
+  name: z.preprocess(emptyToUndefined, z.string().min(1).optional()),
+  phone: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  email: z.preprocess(emptyToNull, z.string().email().nullable().optional()),
+  billing_address: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  billing_address_line_2: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  billing_city: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  billing_state: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  billing_zipcode: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  billing_country: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  service_address: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  service_address_line_2: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  service_city: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  service_state: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  service_zipcode: z.preprocess(emptyToNull, z.string().nullable().optional()),
+  service_country: z.preprocess(emptyToNull, z.string().nullable().optional()),
   same_as_billing: z.boolean().optional(),
-  notes: z.string().nullable().optional(),
+  notes: z.preprocess(emptyToNull, z.string().nullable().optional()),
 })
 
 // GET /api/customers/[id] - Get a single customer
