@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { useRouter } from 'next/navigation'
-import AddressAutocomplete from '@/components/AddressAutocomplete'
+import AddressAutocomplete, { ParsedAddress } from '@/components/AddressAutocomplete'
 import { User, Building2, Users, Sparkles, Shield } from 'lucide-react'
 
 type Step = 'profile' | 'company-choice' | 'create-company' | 'join-company'
@@ -450,10 +450,11 @@ export default function OnboardingPage() {
                   label="Address"
                   value={profileData.address}
                   onChange={(value) => setProfileData({ ...profileData, address: value })}
-                  onPlaceSelected={(components) => {
+                  onPlaceSelected={(components: ParsedAddress) => {
                     setProfileData({
                       ...profileData,
                       address: components.address,
+                      address_line_2: components.addressLine2 || profileData.address_line_2,
                       city: components.city,
                       state: components.state,
                       zipcode: components.zipcode,
@@ -615,10 +616,11 @@ export default function OnboardingPage() {
                   label="Guild Address"
                   value={companyData.address}
                   onChange={(value) => setCompanyData({ ...companyData, address: value })}
-                  onPlaceSelected={(components) => {
+                  onPlaceSelected={(components: ParsedAddress) => {
                     setCompanyData({
                       ...companyData,
                       address: components.address,
+                      address_line_2: components.addressLine2 || companyData.address_line_2,
                       city: components.city,
                       state: components.state,
                       zipcode: components.zipcode,

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cinzel, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
@@ -24,7 +24,12 @@ const cinzel = Cinzel({
 export const metadata: Metadata = {
   title: "GuildTasks - Business Management Platform",
   description: "Manage your business with legendary tools",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=5",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
 };
 
 export default function RootLayout({
@@ -39,7 +44,7 @@ export default function RootLayout({
       <head>
         {googleMapsApiKey && (
           <script
-            src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places`}
+            src={`https://maps.googleapis.com/maps/api/js?key=${googleMapsApiKey}&libraries=places&v=beta&loading=async`}
             async
             defer
           />

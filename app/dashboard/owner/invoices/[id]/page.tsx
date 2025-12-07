@@ -213,6 +213,14 @@ export default function InvoiceViewPage({ params }: PageProps) {
 
   const customer = invoice.customers
 
+  const billToAddress = [
+    customer?.billing_address,
+    customer?.billing_address_line_2,
+    [customer?.billing_city, customer?.billing_state, customer?.billing_zipcode].filter(Boolean).join(' ').trim() || null,
+  ].filter(Boolean).join(', ')
+
+  const billToLine = [customer?.name || 'Customer', billToAddress].filter(Boolean).join(', ')
+
   // Filter out backend-only lines (like "Services for job [uuid]" with $0)
   const filteredLines = lines.filter(line => {
     const desc = line.description?.toLowerCase() || ''
@@ -275,6 +283,17 @@ export default function InvoiceViewPage({ params }: PageProps) {
 
   // Balance = total - deposits - payments
   const balance = total - depositsApplied - paymentsApplied
+
+  const paymentTermDays =
+    invoice.invoice_date && invoice.due_date
+      ? Math.max(
+          0,
+          Math.round(
+            (new Date(invoice.due_date).getTime() - new Date(invoice.invoice_date).getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
+        )
+      : null
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 print:p-0 print:bg-white print:min-h-0">
@@ -385,6 +404,16 @@ export default function InvoiceViewPage({ params }: PageProps) {
                     </span>
                   </div>
                 )}
+                {paymentTermDays !== null && (
+                  <div className="flex justify-end gap-2">
+                    <span className="font-semibold text-gray-700 dark:text-gray-300">
+                      Payment Term:
+                    </span>
+                    <span className="text-gray-900 dark:text-white">
+                      {paymentTermDays} day{paymentTermDays === 1 ? '' : 's'} from invoice date
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-end gap-2">
                   <span className="font-semibold text-gray-700 dark:text-gray-300">
                     Status:
@@ -400,26 +429,35 @@ export default function InvoiceViewPage({ params }: PageProps) {
 
         {/* Bill To Section */}
         <div className="p-8 pb-6">
-          <div className="mb-6">
-            <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-              Bill To
-            </h3>
-            <div className="text-gray-900 dark:text-white">
-              <div className="font-semibold text-lg mb-1">{customer?.name || 'Customer'}</div>
-              {customer?.billing_address && (
-                <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                  <div>{customer.billing_address}</div>
-                  {customer.billing_address_line_2 && <div>{customer.billing_address_line_2}</div>}
-                  {customer.billing_city && (
-                    <div>
-                      {customer.billing_city}, {customer.billing_state} {customer.billing_zipcode}
-                    </div>
-                  )}
-                  {customer.email && <div className="mt-2">Email: {customer.email}</div>}
-                  {customer.phone && <div>Phone: {customer.phone}</div>}
+          <div className="mb-6 grid md:grid-cols-2 gap-6 items-start">
+            <div>
+              <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                Bill To
+              </h3>
+              <div className="text-gray-900 dark:text-white space-y-1">
+                <div className="font-semibold text-base">
+                  {billToLine}
                 </div>
-              )}
+                {(customer?.email || customer?.phone) && (
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {customer?.email && <span>{customer.email}</span>}
+                    {customer?.email && customer?.phone && <span className="mx-2">•</span>}
+                    {customer?.phone && <span>{customer.phone}</span>}
+                  </div>
+                )}
+              </div>
             </div>
+
+            {invoice.notes && (
+              <div>
+                <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                  Notes
+                </h3>
+                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
+                  {invoice.notes}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -528,8 +566,68 @@ export default function InvoiceViewPage({ params }: PageProps) {
 
         {/* Totals Section */}
         <div className="px-8 pb-8">
-          <div className="flex justify-end">
-            <div className="w-80">
+          <div className="flex justify-between items-start gap-8">
+            {/* Payment Details Section - Left Side */}
+            {(company?.paypal_handle || company?.zelle_phone || company?.zelle_email || company?.check_payable_to || company?.accept_cash || company?.accept_credit_debit) && (
+              <div className="flex-1 max-w-md">
+                <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-3">
+                  Payment Details
+                </h3>
+                <div className="space-y-2 text-sm">
+                  {company?.accept_cash && (
+                    <div>
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Cash:</span>
+                      <span className="text-gray-900 dark:text-white ml-2">
+                        Accepted
+                      </span>
+                    </div>
+                  )}
+                  {company?.accept_credit_debit && (
+                    <div>
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Credit/Debit Card:</span>
+                      <span className="text-gray-900 dark:text-white ml-2">
+                        Accepted
+                      </span>
+                    </div>
+                  )}
+                  {company?.paypal_handle && (
+                    <div>
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">PayPal:</span>
+                      <span className="text-gray-900 dark:text-white ml-2">
+                        @{company.paypal_handle}
+                      </span>
+                    </div>
+                  )}
+                  {company?.zelle_phone && (
+                    <div>
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Zelle (Phone):</span>
+                      <span className="text-gray-900 dark:text-white ml-2">
+                        {company.zelle_phone}
+                      </span>
+                    </div>
+                  )}
+                  {company?.zelle_email && (
+                    <div>
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Zelle (Email):</span>
+                      <span className="text-gray-900 dark:text-white ml-2">
+                        {company.zelle_email}
+                      </span>
+                    </div>
+                  )}
+                  {company?.check_payable_to && (
+                    <div>
+                      <span className="font-semibold text-gray-700 dark:text-gray-300">Checks Payable To:</span>
+                      <span className="text-gray-900 dark:text-white ml-2">
+                        {company.check_payable_to}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Totals - Right Side */}
+            <div className="w-80 flex-shrink-0">
               <div className="space-y-3 border-t-2 border-gray-200 dark:border-gray-700 pt-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600 dark:text-gray-400">Subtotal:</span>
@@ -645,24 +743,21 @@ export default function InvoiceViewPage({ params }: PageProps) {
         )}
 
         {/* Notes/Terms Section */}
-        {(invoice.terms || invoice.notes) && (
-          <div className="px-8 pb-8 border-t border-gray-200 dark:border-gray-700 pt-6">
-            {invoice.terms && (
-              <div className="mb-4">
-                <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                  Payment Terms
-                </h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300">{invoice.terms}</p>
-              </div>
-            )}
-            {invoice.notes && (
+        {(company?.late_fee_enabled || company?.phone || company?.email) && (
+          <div className="px-8 pb-8 border-t border-gray-200 dark:border-gray-700 pt-6 space-y-3">
+            {company?.late_fee_enabled && (
               <div>
                 <h3 className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
-                  Notes
+                  Late Fee Policy
                 </h3>
-                <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {invoice.notes}
+                <p className="text-sm text-gray-700 dark:text-gray-300">
+                  Late fees start the day after the invoice due date. An additional <strong>{formatCurrency(company.late_fee_amount)}</strong> is applied every <strong>{company.late_fee_days} days</strong> after the due date until paid.
                 </p>
+              </div>
+            )}
+            {(company?.phone || company?.email) && (
+              <div className="text-sm text-gray-600 dark:text-gray-400">
+                Need help with this bill? Call {company?.phone || 'our office'} or email {company?.email || 'our team'}.
               </div>
             )}
           </div>

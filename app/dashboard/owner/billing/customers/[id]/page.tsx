@@ -64,8 +64,8 @@ export default function CustomerBillingPage({ params }: PageProps) {
         const response = await fetch('/api/companies')
         if (response.ok) {
           const data = await response.json()
-          if (data.companies && data.companies.length > 0) {
-            setCompanyInfo(data.companies[0])
+          if (Array.isArray(data) && data.length > 0) {
+            setCompanyInfo(data[0])
           }
         }
       } catch (error) {
@@ -322,6 +322,7 @@ export default function CustomerBillingPage({ params }: PageProps) {
           jobs={unpaidJobs.data}
           deposits={unappliedPayments.data?.items || []}
           companyInfo={companyInfo}
+          customerId={customerId}
           onSubmit={handleInvoiceSubmit}
           onCancel={handleCancelInvoice}
         />

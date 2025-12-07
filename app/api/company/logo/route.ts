@@ -1,5 +1,5 @@
 /**
- * /api/accountant/logo
+ * /api/company/logo
  *
  * POST: Upload company logo to Supabase Storage
  *       Saves public URL to companies.logo_url

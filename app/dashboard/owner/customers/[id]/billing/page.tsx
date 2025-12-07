@@ -36,6 +36,7 @@ export default function CustomerBillingPage({ params }: PageProps) {
   const [customerName, setCustomerName] = useState('')
   const [invoices, setInvoices] = useState<any[]>([])
   const [invoicesLoading, setInvoicesLoading] = useState(true)
+  const [companyInfo, setCompanyInfo] = useState<any>(null)
 
   const billingHeader = useCustomerBillingHeader(customerId)
   const unpaidJobs = useUnpaidJobs(customerId)
@@ -57,6 +58,24 @@ export default function CustomerBillingPage({ params }: PageProps) {
     }
     fetchCustomer()
   }, [customerId])
+
+  // Fetch company info for invoice preview
+  useEffect(() => {
+    async function fetchCompanyInfo() {
+      try {
+        const response = await fetch('/api/companies')
+        if (response.ok) {
+          const data = await response.json()
+          if (Array.isArray(data) && data.length > 0) {
+            setCompanyInfo(data[0])
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching company info:', error)
+      }
+    }
+    fetchCompanyInfo()
+  }, [])
 
   // Fetch invoices
   useEffect(() => {
@@ -271,7 +290,8 @@ export default function CustomerBillingPage({ params }: PageProps) {
           selectedJobIds={selectedJobIds}
           jobs={unpaidJobs.data || []}
           deposits={unappliedPayments.data?.items || []}
-          companyInfo={null}
+          companyInfo={companyInfo}
+          customerId={customerId}
           onSubmit={handleInvoiceSubmit}
           onCancel={handleCancelInvoice}
         />
