@@ -54,13 +54,13 @@ export function CustomersBalanceList({ customers, loading }: CustomersBalanceLis
       {customers.map((customer) => (
         <div
           key={customer.customer_id}
-          className="flex items-center justify-between p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 transition-colors"
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 transition-colors"
         >
           <div className="flex-1 min-w-0">
             <div className="font-medium text-gray-900 dark:text-gray-100">
               {customer.customer_name}
             </div>
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="text-sm text-gray-500 dark:text-gray-400">
                 {customer.openInvoices} open {customer.openInvoices === 1 ? 'invoice' : 'invoices'}
               </span>
@@ -75,8 +75,8 @@ export function CustomersBalanceList({ customers, loading }: CustomersBalanceLis
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right">
+          <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
+            <div className="text-left sm:text-right">
               <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">
                 Outstanding
               </div>

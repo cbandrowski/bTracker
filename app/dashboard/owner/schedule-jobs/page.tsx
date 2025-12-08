@@ -428,21 +428,21 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header with filters */}
-      <div className="bg-slate-900/50 backdrop-blur-sm shadow-xl rounded-xl p-6 border border-purple-500/20">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-          <div>
+      <div className="bg-slate-900/50 backdrop-blur-sm shadow-xl rounded-xl p-4 sm:p-6 border border-purple-500/20">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 w-full">
+          <div className="space-y-1">
             <h2 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-400">Quest Schedule</h2>
           </div>
 
           {/* Filters */}
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap gap-3 w-full lg:w-auto">
             {/* Employee Filter */}
             <select
               value={employeeFilter}
               onChange={(e) => setEmployeeFilter(e.target.value)}
-              className="px-4 py-2 bg-slate-800/50 text-purple-200 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
+              className="px-4 py-2 bg-slate-800/50 text-purple-200 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm w-full sm:w-auto"
             >
               <option value="all">All Warriors</option>
               <option value="unassigned">🔍 Unassigned Jobs ({unassignedJobs.length})</option>
@@ -455,7 +455,7 @@ export default function SchedulePage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-              className="px-4 py-2 bg-slate-800/50 text-purple-200 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm"
+              className="px-4 py-2 bg-slate-800/50 text-purple-200 border border-purple-500/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 backdrop-blur-sm w-full sm:w-auto"
             >
               <option value="all">All Statuses</option>
               <option value="upcoming">Upcoming Only</option>
@@ -464,7 +464,7 @@ export default function SchedulePage() {
             </select>
 
             {/* View Mode Toggle */}
-            <div className="flex bg-slate-800/50 border border-purple-500/30 rounded-lg overflow-hidden backdrop-blur-sm">
+            <div className="flex bg-slate-800/50 border border-purple-500/30 rounded-lg overflow-hidden backdrop-blur-sm w-full sm:w-auto">
               <button
                 onClick={() => setViewMode('day')}
                 className={`px-4 py-2 font-medium transition-all ${
@@ -502,18 +502,34 @@ export default function SchedulePage() {
 
       {/* Calendar Navigation */}
       <div className="bg-gray-800 shadow-lg rounded-lg p-4 border border-gray-700">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={goToPrevious}
-            className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
-          >
-            ← Previous
-          </button>
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={goToPrevious}
+                className="px-3 sm:px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
+              >
+                ← Prev
+              </button>
+              <button
+                onClick={goToToday}
+                className="px-3 sm:px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
+              >
+                Today
+              </button>
+              <button
+                onClick={goToNext}
+                className="px-3 sm:px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
+              >
+                Next →
+              </button>
+            </div>
+          </div>
 
           <div className="text-center relative">
             <button
               onClick={() => setShowMonthPicker(!showMonthPicker)}
-              className="text-xl font-semibold guild-heading hover:text-primary transition-colors"
+              className="text-xl font-semibold guild-heading hover:text-primary transition-colors w-full md:w-auto"
             >
               {currentDate.toLocaleDateString('en-US', {
                 month: 'long',
@@ -523,16 +539,10 @@ export default function SchedulePage() {
               })}
               <span className="ml-2 text-sm">▼</span>
             </button>
-            <button
-              onClick={goToToday}
-              className="text-sm text-primary hover:text-primary/80 mt-1 block"
-            >
-              Today
-            </button>
 
             {/* Month/Year Picker Dropdown */}
             {showMonthPicker && (
-              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-4 z-50 min-w-[300px]">
+              <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-700 rounded-lg shadow-xl p-4 z-50 min-w-[280px] sm:min-w-[320px]">
                 <div className="space-y-4">
                   {/* Year Selector */}
                   <div>
@@ -610,19 +620,12 @@ export default function SchedulePage() {
               </div>
             )}
           </div>
-
-          <button
-            onClick={goToNext}
-            className="px-4 py-2 glass-surface text-foreground rounded-md hover:bg-muted"
-          >
-            Next →
-          </button>
         </div>
       </div>
 
       {viewMode === 'day' ? (
-        <div className="glass-surface shadow-lg rounded-lg p-6">
-          <div className="flex items-center justify-between">
+        <div className="glass-surface shadow-lg rounded-lg p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <h3 className="text-lg font-semibold guild-heading">Daily Schedule</h3>
             <span className="text-sm text-muted-foreground">
               {currentDate.toLocaleDateString('en-US', {
@@ -633,170 +636,176 @@ export default function SchedulePage() {
               })}
             </span>
           </div>
-          <div className="mt-6 grid grid-cols-[70px_1fr] gap-4">
-            <div className="text-right text-xs text-muted-foreground">
-              {Array.from({ length: HOURS_IN_DAY }).map((_, hour) => (
-                <div key={hour} className="h-16 relative">
-                  <span className="absolute top-1/2 right-2 -translate-y-1/2">
-                    {getHourLabel(hour)}
-                  </span>
-                </div>
-              ))}
-            </div>
-            <div
-              className="relative border-l border-border rounded-lg glass-surface overflow-hidden"
-              style={{ height: `${timelineHeight}px` }}
-              onClick={() => setSelectedAssignment(null)}
-            >
-              <div className="absolute inset-0 pointer-events-none">
+          <div className="mt-6 overflow-x-auto">
+            <div className="flex min-w-full sm:min-w-[900px] gap-4">
+              <div className="w-14 text-right text-xs text-muted-foreground pr-2 flex flex-col">
                 {Array.from({ length: HOURS_IN_DAY }).map((_, hour) => (
-                  <div key={hour} className="h-16 border-b border-border/50"></div>
+                  <div key={hour} className="h-16 relative">
+                    <span className="absolute top-1/2 right-0 -translate-y-1/2">
+                      {getHourLabel(hour)}
+                    </span>
+                  </div>
                 ))}
               </div>
-              <div className="relative h-full">
-                {dayAssignments.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-                    No assignments scheduled
+              <div
+                className="relative flex-1 border border-border rounded-lg glass-surface overflow-hidden"
+                style={{ height: `${timelineHeight}px` }}
+                onClick={() => setSelectedAssignment(null)}
+              >
+                <div className="absolute inset-0 pointer-events-none">
+                  {Array.from({ length: HOURS_IN_DAY }).map((_, hour) => (
+                    <div key={hour} className="h-16 border-b border-border/50"></div>
+                  ))}
+                </div>
+                <div className="relative h-full">
+                  {dayAssignments.length === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                      No assignments scheduled
+                    </div>
+                  )}
+                  {dayAssignments.map(assignment => {
+                    // If no service_start_at but has planned_end_date, show as all-day at top
+                    const hasServiceTime = !!assignment.service_start_at
+
+                    let top = 0
+                    let height = 0
+
+                    if (hasServiceTime) {
+                      const startMinutes = Math.max(0, Math.min(minutesSinceStartOfDay(assignment.service_start_at!), HOURS_IN_DAY * 60))
+                      const endMinutesRaw = assignment.service_end_at ? minutesSinceStartOfDay(assignment.service_end_at) : startMinutes + 60
+                      const endMinutes = Math.max(startMinutes + MIN_MINUTES_PER_BLOCK, Math.min(endMinutesRaw, HOURS_IN_DAY * 60))
+                      const durationMinutes = Math.max(MIN_MINUTES_PER_BLOCK, endMinutes - startMinutes)
+                      top = startMinutes * minuteHeight
+                      height = durationMinutes * minuteHeight
+                    } else {
+                      // All-day event - show at top with fixed height
+                      top = 0
+                      height = HOUR_BLOCK_HEIGHT
+                    }
+
+                    return (
+                      <div
+                        key={assignment.id}
+                        className={`absolute left-4 right-4 p-3 rounded-lg border shadow-sm cursor-pointer transition-all hover:ring-2 hover:ring-primary ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-primary' : ''} ${!hasServiceTime ? 'opacity-80' : ''}`}
+                        style={{ top: `${top}px`, height: `${height}px` }}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setSelectedAssignment(assignment)
+                        }}
+                      >
+                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          {assignment.employee?.profile?.full_name || '🔍 Unassigned'}
+                        </div>
+                        <div className="text-lg font-bold text-foreground truncate">
+                          {assignment.job?.title || 'Untitled Job'}
+                        </div>
+                        <div className="text-xs text-gray-300 mt-1">
+                          {assignment.job?.customer?.name || 'No customer'}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {formatTimeRange(assignment.service_start_at, assignment.service_end_at, assignment.job?.planned_end_date)}
+                        </div>
+                        <div className="mt-2">
+                          <span className="text-xs px-2 py-0.5 rounded glass-surface border border-border">
+                            {getStatusBadge(assignment.assignment_status)}
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="glass-surface shadow-lg rounded-lg p-4 sm:p-6">
+          <div className="overflow-x-auto">
+            <div className="min-w-full sm:min-w-[900px]">
+              {/* Day headers */}
+              <div className="grid grid-cols-7 gap-2 mb-4">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="text-center font-semibold text-muted-foreground py-2">
+                    {day}
                   </div>
-                )}
-                {dayAssignments.map(assignment => {
-                  // If no service_start_at but has planned_end_date, show as all-day at top
-                  const hasServiceTime = !!assignment.service_start_at
+                ))}
+              </div>
 
-                  let top = 0
-                  let height = 0
-
-                  if (hasServiceTime) {
-                    const startMinutes = Math.max(0, Math.min(minutesSinceStartOfDay(assignment.service_start_at!), HOURS_IN_DAY * 60))
-                    const endMinutesRaw = assignment.service_end_at ? minutesSinceStartOfDay(assignment.service_end_at) : startMinutes + 60
-                    const endMinutes = Math.max(startMinutes + MIN_MINUTES_PER_BLOCK, Math.min(endMinutesRaw, HOURS_IN_DAY * 60))
-                    const durationMinutes = Math.max(MIN_MINUTES_PER_BLOCK, endMinutes - startMinutes)
-                    top = startMinutes * minuteHeight
-                    height = durationMinutes * minuteHeight
-                  } else {
-                    // All-day event - show at top with fixed height
-                    top = 0
-                    height = HOUR_BLOCK_HEIGHT
-                  }
+              {/* Calendar days */}
+              <div className="grid grid-cols-7 gap-2">
+                {calendarData.map((day, index) => {
+                  const dayAssignments = getAssignmentsForDay(day)
+                  const isTodayDate = isToday(day)
+                  const isCurrentMonthDate = isCurrentMonth(day)
 
                   return (
                     <div
-                      key={assignment.id}
-                      className={`absolute left-4 right-4 p-3 rounded-lg border shadow-sm cursor-pointer transition-all hover:ring-2 hover:ring-primary ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-primary' : ''} ${!hasServiceTime ? 'opacity-80' : ''}`}
-                      style={{ top: `${top}px`, height: `${height}px` }}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        setSelectedAssignment(assignment)
+                      key={index}
+                      className={`min-h-32 p-2 rounded-lg border cursor-pointer ${
+                        isTodayDate
+                          ? 'glass-surface border-primary'
+                          : 'glass-surface border-border'
+                      } ${
+                        viewMode === 'month' && !isCurrentMonthDate
+                          ? 'opacity-40'
+                          : ''
+                      }`}
+                      onClick={() => {
+                        handleDaySelection(day)
+                        setSelectedAssignment(null)
                       }}
                     >
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        {assignment.employee?.profile?.full_name || '🔍 Unassigned'}
+                      <div className={`text-sm font-semibold mb-2 ${
+                        isTodayDate ? 'text-primary' : 'text-muted-foreground'
+                      }`}>
+                        {day.getDate()}
                       </div>
-                      <div className="text-lg font-bold text-foreground truncate">
-                        {assignment.job?.title || 'Untitled Job'}
-                      </div>
-                      <div className="text-xs text-gray-300 mt-1">
-                        {assignment.job?.customer?.name || 'No customer'}
-                      </div>
-                      <div className="text-xs text-muted-foreground">
-                        {formatTimeRange(assignment.service_start_at, assignment.service_end_at, assignment.job?.planned_end_date)}
-                      </div>
-                      <div className="mt-2">
-                        <span className="text-xs px-2 py-0.5 rounded glass-surface border border-border">
-                          {getStatusBadge(assignment.assignment_status)}
-                        </span>
+
+                      {/* Assignments for this day */}
+                      <div className="space-y-1">
+                        {dayAssignments.slice(0, viewMode === 'week' ? 10 : 3).map(assignment => (
+                          <div
+                            key={assignment.id}
+                            className={`relative text-xs p-2 rounded border cursor-pointer transition-all hover:ring-2 hover:ring-primary ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-primary' : ''}`}
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleDaySelection(day)
+                              setSelectedAssignment(assignment)
+                            }}
+                          >
+                            <div className="font-semibold truncate">
+                              {assignment.service_start_at ? formatTime(assignment.service_start_at) : 'All day'}
+                            </div>
+                            <div className="truncate">{assignment.job?.title || 'Untitled Job'}</div>
+                            {viewMode === 'week' && (
+                              <>
+                                <div className="truncate text-muted-foreground">
+                                  {assignment.employee?.profile?.full_name || '🔍 Unassigned'}
+                                </div>
+                                <div className="truncate text-muted-foreground">
+                                  {assignment.job?.customer?.name || 'No customer'}
+                                </div>
+                              </>
+                            )}
+                            {/* Click indicator */}
+                            <div className="absolute bottom-1 right-1 text-muted-foreground hover:text-foreground">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a 1 1 0 001 1h1a 1 1 0 100-2v-3a 1 1 0 00-1-1H9z" clipRule="evenodd" />
+                              </svg>
+                            </div>
+                          </div>
+                        ))}
+                        {dayAssignments.length > (viewMode === 'week' ? 10 : 3) && (
+                          <div className="text-xs text-muted-foreground pl-2">
+                            +{dayAssignments.length - (viewMode === 'week' ? 10 : 3)} more
+                          </div>
+                        )}
                       </div>
                     </div>
                   )
                 })}
               </div>
             </div>
-          </div>
-        </div>
-      ) : (
-        <div className="glass-surface shadow-lg rounded-lg p-6">
-          {/* Day headers */}
-          <div className="grid grid-cols-7 gap-2 mb-4">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center font-semibold text-muted-foreground py-2">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Calendar days */}
-          <div className="grid grid-cols-7 gap-2">
-            {calendarData.map((day, index) => {
-              const dayAssignments = getAssignmentsForDay(day)
-              const isTodayDate = isToday(day)
-              const isCurrentMonthDate = isCurrentMonth(day)
-
-              return (
-                <div
-                  key={index}
-                  className={`min-h-32 p-2 rounded-lg border cursor-pointer ${
-                    isTodayDate
-                      ? 'glass-surface border-primary'
-                      : 'glass-surface border-border'
-                  } ${
-                    viewMode === 'month' && !isCurrentMonthDate
-                      ? 'opacity-40'
-                      : ''
-                  }`}
-                  onClick={() => {
-                    handleDaySelection(day)
-                    setSelectedAssignment(null)
-                  }}
-                >
-                  <div className={`text-sm font-semibold mb-2 ${
-                    isTodayDate ? 'text-primary' : 'text-muted-foreground'
-                  }`}>
-                    {day.getDate()}
-                  </div>
-
-                  {/* Assignments for this day */}
-                  <div className="space-y-1">
-                    {dayAssignments.slice(0, viewMode === 'week' ? 10 : 3).map(assignment => (
-                      <div
-                        key={assignment.id}
-                        className={`relative text-xs p-2 rounded border cursor-pointer transition-all hover:ring-2 hover:ring-primary ${getStatusColor(assignment.assignment_status)} ${selectedAssignment?.id === assignment.id ? 'ring-2 ring-primary' : ''}`}
-                        onClick={(event) => {
-                          event.stopPropagation()
-                          handleDaySelection(day)
-                          setSelectedAssignment(assignment)
-                        }}
-                      >
-                        <div className="font-semibold truncate">
-                          {assignment.service_start_at ? formatTime(assignment.service_start_at) : 'All day'}
-                        </div>
-                        <div className="truncate">{assignment.job?.title || 'Untitled Job'}</div>
-                        {viewMode === 'week' && (
-                          <>
-                            <div className="truncate text-muted-foreground">
-                              {assignment.employee?.profile?.full_name || '🔍 Unassigned'}
-                            </div>
-                            <div className="truncate text-muted-foreground">
-                              {assignment.job?.customer?.name || 'No customer'}
-                            </div>
-                          </>
-                        )}
-                        {/* Click indicator */}
-                        <div className="absolute bottom-1 right-1 text-muted-foreground hover:text-foreground">
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a 1 1 0 001 1h1a 1 1 0 100-2v-3a 1 1 0 00-1-1H9z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      </div>
-                    ))}
-                    {dayAssignments.length > (viewMode === 'week' ? 10 : 3) && (
-                      <div className="text-xs text-muted-foreground pl-2">
-                        +{dayAssignments.length - (viewMode === 'week' ? 10 : 3)} more
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )
-            })}
           </div>
         </div>
       )}

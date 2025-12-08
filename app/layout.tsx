@@ -40,7 +40,7 @@ export default function RootLayout({
   const googleMapsApiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY
 
   return (
-    <html lang="en">
+    <html lang="en" className="dark" suppressHydrationWarning>
       <head>
         {googleMapsApiKey && (
           <script
@@ -51,7 +51,7 @@ export default function RootLayout({
         )}
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} antialiased min-h-screen bg-[#0c0a08] text-[#f6e7c6]`}
       >
         <AuthProvider>
           {children}

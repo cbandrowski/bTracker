@@ -7,11 +7,25 @@
 
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
 
+export type CustomerStatus = 'active' | 'archived' | 'all'
+
+export interface CustomerServiceAddress {
+  id: string
+  label: string | null
+  address: string | null
+  address_line_2: string | null
+  city: string | null
+  state: string | null
+  zipcode: string | null
+  country: string | null
+}
+
 export interface CustomerWithBilling {
   id: string
   name: string
   email: string | null
   phone: string | null
+  company_id: string
   billing_address: string | null
   billing_address_line_2: string | null
   billing_city: string | null
@@ -25,17 +39,22 @@ export interface CustomerWithBilling {
   service_zipcode: string | null
   service_country: string | null
   same_as_billing: boolean | null
+  archived: boolean
+  archived_at: string | null
   billedBalance: number
   unappliedCredit: number
   openInvoices: number
   created_at: string
+  serviceAddresses?: CustomerServiceAddress[]
 }
 
 /**
  * Get all customers with their billing information
  * Efficiently fetches in parallel to avoid N+1 queries
  */
-export async function getCustomersWithBilling(): Promise<CustomerWithBilling[]> {
+export async function getCustomersWithBilling(
+  status: CustomerStatus = 'active'
+): Promise<CustomerWithBilling[]> {
   const supabase = await createServerClient()
   const user = await getCurrentUser(supabase)
 
@@ -49,11 +68,12 @@ export async function getCustomersWithBilling(): Promise<CustomerWithBilling[]> 
   }
 
   // Fetch customers with full address information
-  const { data: customers, error: customersError } = await supabase
+  let query = supabase
     .from('customers')
     .select(`
       id,
       name,
+      company_id,
       email,
       phone,
       billing_address,
@@ -69,26 +89,41 @@ export async function getCustomersWithBilling(): Promise<CustomerWithBilling[]> 
       service_zipcode,
       service_country,
       same_as_billing,
+      archived,
+      archived_at,
       created_at
     `)
     .in('company_id', companyIds)
-    .order('created_at', { ascending: false })
+
+  if (status !== 'all') {
+    query = query.eq('archived', status === 'archived')
+  }
+
+  const { data: customers, error: customersError } = await query.order('created_at', { ascending: false })
 
   if (customersError || !customers) {
     console.error('Error fetching customers:', customersError)
     return []
   }
 
-  // Batch fetch billing data in parallel
+  // Batch fetch billing data and service addresses in parallel
   const customersWithBilling = await Promise.all(
     customers.map(async (customer) => {
-      const billingData = await getCustomerBillingHeader(customer.id)
+      const [billingData, serviceAddressesData] = await Promise.all([
+        getCustomerBillingHeader(customer.id),
+        supabase
+          .from('customer_service_addresses')
+          .select('id, label, address, address_line_2, city, state, zipcode, country')
+          .eq('customer_id', customer.id)
+          .order('created_at', { ascending: true })
+      ])
 
       return {
         ...customer,
         billedBalance: billingData.billedBalance,
         unappliedCredit: billingData.unappliedCredit,
         openInvoices: billingData.openInvoices,
+        serviceAddresses: serviceAddressesData.data || [],
       }
     })
   )

@@ -183,10 +183,10 @@ export default function CustomerBillingPage({ params }: PageProps) {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex items-start sm:items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
@@ -202,10 +202,11 @@ export default function CustomerBillingPage({ params }: PageProps) {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             onClick={() => setDepositDrawerOpen(true)}
+            className="w-full sm:w-auto"
           >
             <CreditCard className="mr-2 h-4 w-4" />
             Add Deposit
@@ -213,6 +214,7 @@ export default function CustomerBillingPage({ params }: PageProps) {
           <Button
             variant="outline"
             onClick={() => setPaymentDrawerOpen(true)}
+            className="w-full sm:w-auto"
           >
             <CreditCard className="mr-2 h-4 w-4" />
             Add Payment
@@ -220,6 +222,7 @@ export default function CustomerBillingPage({ params }: PageProps) {
           <Button
             onClick={() => handleCreateInvoice([])}
             disabled={unpaidJobs.loading}
+            className="w-full sm:w-auto"
           >
             <Plus className="mr-2 h-4 w-4" />
             Create Invoice
@@ -293,7 +296,7 @@ export default function CustomerBillingPage({ params }: PageProps) {
       </div>
 
       {/* Unpaid Done Jobs */}
-      <div className="rounded-lg border p-6 bg-gray-800">
+      <div className="rounded-lg border p-4 sm:p-6 bg-gray-800">
         <h2 className="text-lg font-semibold text-white mb-4">Unpaid Done Jobs</h2>
         <UnpaidJobsTable
           jobs={unpaidJobs.data}
@@ -304,7 +307,7 @@ export default function CustomerBillingPage({ params }: PageProps) {
 
       {/* Deposits Available */}
       {unappliedPayments.data && unappliedPayments.data.items.length > 0 && !showInvoiceForm && (
-        <div className="rounded-lg border p-6 bg-gray-800">
+        <div className="rounded-lg border p-4 sm:p-6 bg-gray-800">
           <h2 className="text-lg font-semibold text-white mb-4">Deposits Available</h2>
           <DepositsList
             deposits={unappliedPayments.data.items}
@@ -331,7 +334,7 @@ export default function CustomerBillingPage({ params }: PageProps) {
       {/* Invoices List */}
       <div className="rounded-lg border p-6 bg-gray-800">
         <h2 className="text-lg font-semibold text-white mb-4">Invoices</h2>
-        <InvoicesList invoices={invoices} loading={invoicesLoading} />
+        <InvoicesList invoices={invoices} loading={invoicesLoading} onRefresh={refreshAllData} />
       </div>
 
       {/* Add Deposit Drawer */}

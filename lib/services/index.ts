@@ -2,7 +2,40 @@
 // Provides type-safe methods for all backend API routes
 
 import { api } from '../api'
-import { Customer, Job, JobAssignment, CompanyEmployee, Company, JobWithCustomer, Profile } from '@/types/database'
+import { Customer, Job, JobAssignment, CompanyEmployee, Company, JobWithCustomer, Profile, InvoiceStatus } from '@/types/database'
+
+type CustomerStatus = 'active' | 'archived' | 'all'
+
+type InvoiceLineType = 'service' | 'parts' | 'supplies' | 'labor' | 'deposit_applied' | 'adjustment' | 'other'
+
+export interface InvoiceUpdateLine {
+  description: string
+  quantity: number
+  unitPrice: number
+  taxRate: number
+  lineType: InvoiceLineType
+  jobId?: string | null
+  appliedPaymentId?: string | null
+}
+
+export interface UpdateInvoicePayload {
+  invoiceDate?: string
+  dueDate?: string | null
+  terms?: string | null
+  notes?: string | null
+  status?: Extract<InvoiceStatus, 'draft' | 'issued' | 'partial' | 'paid' | 'cancelled' | 'void'>
+  lines: InvoiceUpdateLine[]
+}
+
+export interface CustomerServiceAddressPayload {
+  label: string
+  address?: string | null
+  address_line_2?: string | null
+  city?: string | null
+  state?: string | null
+  zipcode?: string | null
+  country?: string | null
+}
 
 // ============================================================================
 // CUSTOMERS SERVICE
@@ -10,8 +43,8 @@ import { Customer, Job, JobAssignment, CompanyEmployee, Company, JobWithCustomer
 
 export const customersService = {
   // Get all customers
-  async getAll() {
-    return api.get<Customer[]>('/customers')
+  async getAll(status: CustomerStatus = 'active') {
+    return api.get<Customer[]>(`/customers?status=${status}`)
   },
 
   // Get a single customer
@@ -29,9 +62,32 @@ export const customersService = {
     return api.put<Customer>(`/customers/${id}`, customerData)
   },
 
+  async setArchived(id: string, archived: boolean) {
+    return api.put<Customer>(`/customers/${id}`, { archived })
+  },
+
   // Delete a customer
   async delete(id: string) {
     return api.delete<{ success: boolean }>(`/customers/${id}`)
+  },
+}
+
+// ============================================================================ 
+// CUSTOMER SERVICE ADDRESSES
+// ============================================================================
+
+export const customerAddressesService = {
+  async list(customerId: string) {
+    return api.get(`/customers/${customerId}/service-addresses`)
+  },
+  async create(customerId: string, payload: CustomerServiceAddressPayload) {
+    return api.post(`/customers/${customerId}/service-addresses`, payload)
+  },
+  async update(customerId: string, addressId: string, payload: CustomerServiceAddressPayload) {
+    return api.put(`/customers/${customerId}/service-addresses/${addressId}`, payload)
+  },
+  async delete(customerId: string, addressId: string) {
+    return api.delete<{ success: boolean }>(`/customers/${customerId}/service-addresses/${addressId}`)
   },
 }
 
@@ -132,5 +188,18 @@ export const companiesService = {
   // Get all companies owned by user
   async getAll() {
     return api.get<Company[]>('/companies')
+  },
+}
+
+// ============================================================================
+// INVOICES SERVICE
+// ============================================================================
+
+export const invoicesService = {
+  async update(id: string, payload: UpdateInvoicePayload) {
+    return api.patch(`/invoices/${id}`, payload)
+  },
+  async delete(id: string) {
+    return api.delete<{ success: boolean }>(`/invoices/${id}`)
   },
 }

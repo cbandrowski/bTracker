@@ -18,7 +18,20 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { MoreHorizontal, Eye, CreditCard, FileText, Edit, Briefcase, Repeat, FilePlus2, Search, X } from 'lucide-react'
+import {
+  MoreHorizontal,
+  Eye,
+  CreditCard,
+  FileText,
+  Edit,
+  Briefcase,
+  Repeat,
+  FilePlus2,
+  Search,
+  X,
+  Archive,
+  RotateCcw,
+} from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import React, { useState, useMemo } from 'react'
 import AddressAutocomplete, { ParsedAddress } from '@/components/AddressAutocomplete'
@@ -39,6 +52,7 @@ interface CustomersTableProps {
   onServiceAddressSelect?: (address: ParsedAddress) => void
   onSameAsBillingToggle?: (checked: boolean) => void
   onInputChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
+  onArchiveToggle?: (customer: CustomerWithBilling, archived: boolean) => void
 }
 
 export function CustomersTable({
@@ -56,7 +70,8 @@ export function CustomersTable({
   onBillingAddressSelect,
   onServiceAddressSelect,
   onSameAsBillingToggle,
-  onInputChange
+  onInputChange,
+  onArchiveToggle,
 }: CustomersTableProps) {
   const router = useRouter()
   const [sortColumn, setSortColumn] = useState<keyof CustomerWithBilling | null>(null)
@@ -109,6 +124,20 @@ export function CustomersTable({
       if (customer.service_city?.toLowerCase().includes(query)) return true
       if (customer.service_state?.toLowerCase().includes(query)) return true
       if (customer.service_zipcode?.toLowerCase().includes(query)) return true
+
+      // Search in additional service addresses
+      if (customer.serviceAddresses && customer.serviceAddresses.length > 0) {
+        const foundInServiceAddress = customer.serviceAddresses.some(addr => {
+          if (addr.label?.toLowerCase().includes(query)) return true
+          if (addr.address?.toLowerCase().includes(query)) return true
+          if (addr.address_line_2?.toLowerCase().includes(query)) return true
+          if (addr.city?.toLowerCase().includes(query)) return true
+          if (addr.state?.toLowerCase().includes(query)) return true
+          if (addr.zipcode?.toLowerCase().includes(query)) return true
+          return false
+        })
+        if (foundInServiceAddress) return true
+      }
 
       // Search in email
       if (customer.email?.toLowerCase().includes(query)) return true
@@ -210,7 +239,14 @@ export function CustomersTable({
             {/* Header with name and actions */}
             <div className="flex justify-between items-start">
               <div className="flex-1">
-                <h3 className="font-semibold text-white text-lg">{customer.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-white text-lg">{customer.name}</h3>
+                  {customer.archived && (
+                    <Badge variant="outline" className="text-xs border-amber-400 text-amber-200">
+                      Archived
+                    </Badge>
+                  )}
+                </div>
                 {customer.billing_address ? (
                   <p className="text-sm text-gray-400">
                     {customer.billing_address}
@@ -286,6 +322,18 @@ export function CustomersTable({
                     <CreditCard className="mr-2 h-4 w-4" />
                     Add Payment
                   </DropdownMenuItem>
+                  {onArchiveToggle && (
+                    <DropdownMenuItem
+                      onClick={() => onArchiveToggle(customer, !customer.archived)}
+                    >
+                      {customer.archived ? (
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Archive className="mr-2 h-4 w-4" />
+                      )}
+                      {customer.archived ? 'Restore Customer' : 'Archive Customer'}
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -661,7 +709,14 @@ export function CustomersTable({
                 <TableRow id={`customer-${customer.id}`} className="group">
                   <TableCell className="align-top">
                     <div className="flex flex-col">
-                      <span className="font-medium text-foreground">{customer.name}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-foreground">{customer.name}</span>
+                        {customer.archived && (
+                          <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-200">
+                            Archived
+                          </Badge>
+                        )}
+                      </div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
                         {customer.email || '-'}
                       </span>
@@ -795,6 +850,18 @@ export function CustomersTable({
                         <CreditCard className="mr-2 h-4 w-4" />
                         Add Payment
                       </DropdownMenuItem>
+                      {onArchiveToggle && (
+                        <DropdownMenuItem
+                          onClick={() => onArchiveToggle(customer, !customer.archived)}
+                        >
+                          {customer.archived ? (
+                            <RotateCcw className="mr-2 h-4 w-4" />
+                          ) : (
+                            <Archive className="mr-2 h-4 w-4" />
+                          )}
+                          {customer.archived ? 'Restore Customer' : 'Archive Customer'}
+                        </DropdownMenuItem>
+                      )}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>

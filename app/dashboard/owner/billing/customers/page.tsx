@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getCustomersWithBilling, CustomerWithBilling } from '@/app/actions/customers'
+import { getCustomersWithBilling, CustomerStatus, CustomerWithBilling } from '@/app/actions/customers'
 import { CustomersTable } from '@/components/customers/CustomersTable'
 import { AddPaymentDrawer } from '@/components/customers/AddPaymentDrawer'
 import { ApplyPaymentDrawer } from '@/components/billing/ApplyPaymentDrawer'
@@ -10,6 +10,7 @@ import { CreateRecurringJobDrawer } from '@/components/jobs/CreateRecurringJobDr
 import { CustomersTableSkeleton } from '@/components/customers/CustomersTableSkeleton'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft } from 'lucide-react'
+import { customersService } from '@/lib/services'
 import {
   Select,
   SelectContent,
@@ -28,6 +29,7 @@ export default function BillingCustomersPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [jobStatusFilter, setJobStatusFilter] = useState<JobStatusFilter>('all')
+  const [statusFilter, setStatusFilter] = useState<CustomerStatus>('active')
   const [searchQuery, setSearchQuery] = useState('')
   const [depositDrawerOpen, setDepositDrawerOpen] = useState(false)
   const [paymentDrawerOpen, setPaymentDrawerOpen] = useState(false)
@@ -38,7 +40,7 @@ export default function BillingCustomersPage() {
   } | null>(null)
 
   // Fetch customers with job status information
-  const fetchCustomersData = async () => {
+  const fetchCustomersData = async (status: CustomerStatus = statusFilter) => {
     try {
       if (customers.length === 0) {
         setLoading(true)
@@ -46,7 +48,7 @@ export default function BillingCustomersPage() {
         setRefreshing(true)
       }
       // Pull billing info only; skip per-customer job status to avoid N+1 requests.
-      const billingData = await getCustomersWithBilling()
+      const billingData = await getCustomersWithBilling(status)
       setCustomers(billingData)
       setFilteredCustomers(billingData)
     } catch (error) {
@@ -58,8 +60,8 @@ export default function BillingCustomersPage() {
   }
 
   useEffect(() => {
-    fetchCustomersData()
-  }, [])
+    fetchCustomersData(statusFilter)
+  }, [statusFilter])
 
   // Filter customers based on job status and search
   useEffect(() => {
@@ -130,6 +132,18 @@ export default function BillingCustomersPage() {
     router.push(`/dashboard/owner/billing/customers/${customer.id}`)
   }
 
+  const handleArchiveToggle = async (customer: CustomerWithBilling, archived: boolean) => {
+    try {
+      const response = await customersService.setArchived(customer.id, archived)
+      if (response.error) {
+        throw new Error(response.error)
+      }
+      await fetchCustomersData(statusFilter)
+    } catch (error) {
+      console.error('Error updating customer archive status:', error)
+    }
+  }
+
   return (
     <div className="space-y-6 p-6">
       {/* Header */}
@@ -161,6 +175,18 @@ export default function BillingCustomersPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="bg-gray-900 border-gray-600"
           />
+        </div>
+        <div className="w-52">
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as CustomerStatus)}>
+            <SelectTrigger className="bg-gray-900 border-gray-600">
+              <SelectValue placeholder="Filter by archive status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="archived">Archived</SelectItem>
+              <SelectItem value="all">All</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
         <div className="w-64">
           <Select value={jobStatusFilter} onValueChange={(value) => setJobStatusFilter(value as JobStatusFilter)}>
@@ -197,6 +223,7 @@ export default function BillingCustomersPage() {
             onAddPayment={handleAddPayment}
             onEditCustomer={handleEditCustomer}
             onCreateRecurringJob={handleCreateRecurringJob}
+            onArchiveToggle={handleArchiveToggle}
           />
         )}
       </div>

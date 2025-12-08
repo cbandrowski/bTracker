@@ -110,56 +110,58 @@ export function UnpaidJobsTable({ jobs, loading, onCreateInvoice }: UnpaidJobsTa
         </Button>
       </div>
 
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">
-                <Checkbox
-                  checked={allSelected}
-                  onCheckedChange={handleSelectAll}
-                  aria-label="Select all jobs"
-                  className={someSelected ? 'data-[state=checked]:bg-gray-400' : ''}
-                />
-              </TableHead>
-              <TableHead>Job</TableHead>
-              <TableHead>Completed At</TableHead>
-              <TableHead className="text-right">Est. Amount</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {jobs.map((job) => {
-              const isSelected = selectedJobs.has(job.id)
-              return (
-                <TableRow key={job.id}>
-                  <TableCell>
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={(checked) =>
-                        handleSelectJob(job.id, checked as boolean)
-                      }
-                      aria-label={`Select ${job.title}`}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <div>
-                      <div className="font-medium">{job.title}</div>
-                      {job.description && (
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {job.description}
-                        </div>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell>{formatDate(job.completed_at)}</TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(job.estimated_amount)}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
+      <div className="rounded-md border overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table className="min-w-[640px]">
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={allSelected}
+                    onCheckedChange={handleSelectAll}
+                    aria-label="Select all jobs"
+                    className={someSelected ? 'data-[state=checked]:bg-gray-400' : ''}
+                  />
+                </TableHead>
+                <TableHead>Job</TableHead>
+                <TableHead>Completed At</TableHead>
+                <TableHead className="text-right">Est. Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {jobs.map((job) => {
+                const isSelected = selectedJobs.has(job.id)
+                return (
+                  <TableRow key={job.id}>
+                    <TableCell>
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={(checked) =>
+                          handleSelectJob(job.id, checked as boolean)
+                        }
+                        aria-label={`Select ${job.title}`}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <div>
+                        <div className="font-medium">{job.title}</div>
+                        {job.description && (
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {job.description}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>{formatDate(job.completed_at)}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(job.estimated_amount)}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
       </div>
     </div>
   )

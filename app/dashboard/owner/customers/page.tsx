@@ -1,17 +1,24 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Customer } from '@/types/database'
 import AddressAutocomplete, { ParsedAddress } from '@/components/AddressAutocomplete'
 import { useRouter } from 'next/navigation'
 import { customersService, companiesService } from '@/lib/services'
-import { getCustomersWithBilling, CustomerWithBilling } from '@/app/actions/customers'
+import { getCustomersWithBilling, CustomerStatus, CustomerWithBilling } from '@/app/actions/customers'
 import { CustomersTable } from '@/components/customers/CustomersTable'
 import { AddPaymentDrawer } from '@/components/customers/AddPaymentDrawer'
 import { ApplyPaymentDrawer } from '@/components/billing/ApplyPaymentDrawer'
 import { CustomersTableSkeleton } from '@/components/customers/CustomersTableSkeleton'
 import { CreateRecurringJobDrawer } from '@/components/jobs/CreateRecurringJobDrawer'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 
 export default function CustomersPage() {
   const { profile } = useAuth()
@@ -21,6 +28,7 @@ export default function CustomersPage() {
   const [loadingData, setLoadingData] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [companyId, setCompanyId] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<CustomerStatus>('active')
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [depositDrawerOpen, setDepositDrawerOpen] = useState(false)
   const [paymentDrawerOpen, setPaymentDrawerOpen] = useState(false)
@@ -53,7 +61,7 @@ export default function CustomersPage() {
 
   const [submitting, setSubmitting] = useState(false)
 
-  const fetchCustomersData = async () => {
+  const fetchCustomersData = useCallback(async (status: CustomerStatus = statusFilter) => {
     if (!profile?.id) {
       setLoadingData(false)
       return
@@ -73,7 +81,7 @@ export default function CustomersPage() {
       setCompanyId(companiesResponse.data[0].id) // Use first company for now
 
       // Fetch customers via API
-      const response = await customersService.getAll()
+      const response = await customersService.getAll(status)
 
       if (response.error) {
         console.error('Error fetching customers:', response.error)
@@ -84,20 +92,20 @@ export default function CustomersPage() {
       setCustomers(response.data || [])
 
       // Fetch customers with billing data
-      const billingData = await getCustomersWithBilling()
+      const billingData = await getCustomersWithBilling(status)
       setCustomersWithBilling(billingData)
     } catch (error) {
       console.error('Error fetching customers:', error)
     }
 
     setLoadingData(false)
-  }
+  }, [profile?.id, statusFilter])
 
   useEffect(() => {
     if (profile) {
-      fetchCustomersData()
+      fetchCustomersData(statusFilter)
     }
-  }, [profile])
+  }, [profile, statusFilter, fetchCustomersData])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -319,6 +327,19 @@ export default function CustomersPage() {
     fetchCustomersData()
   }
 
+  const handleArchiveToggle = async (customer: CustomerWithBilling, archived: boolean) => {
+    try {
+      const response = await customersService.setArchived(customer.id, archived)
+      if (response.error) {
+        throw new Error(response.error)
+      }
+      await fetchCustomersData()
+    } catch (error) {
+      console.error('Error updating customer archive status:', error)
+      alert('Unable to update customer status. Please try again.')
+    }
+  }
+
   if (loadingData) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -331,9 +352,21 @@ export default function CustomersPage() {
     <div className="space-y-6">
       <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-lg font-semibold text-white">
-            Customers ({customers.length})
-          </h2>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-semibold text-white">
+              Customers ({customers.length})
+            </h2>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as CustomerStatus)}>
+              <SelectTrigger className="w-32 bg-gray-900 border border-gray-700 text-gray-100">
+                <SelectValue placeholder="Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="archived">Archived</SelectItem>
+                <SelectItem value="all">All</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <button
             onClick={() => setShowForm(!showForm)}
             className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -590,6 +623,7 @@ export default function CustomersPage() {
             onAddPayment={handleAddPayment}
             onEditCustomer={handleEditCustomer}
             onCreateRecurringJob={handleCreateRecurringJob}
+            onArchiveToggle={handleArchiveToggle}
             editingCustomer={editingCustomer}
             formData={formData}
             onFormChange={setFormData}
