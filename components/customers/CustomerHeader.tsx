@@ -3,7 +3,7 @@
 import { Customer } from '@/types/customer-details'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Plus, FileText, CreditCard } from 'lucide-react'
+import { ArrowLeft, Plus, FileText, CreditCard, Trash } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -14,6 +14,7 @@ interface CustomerHeaderProps {
 export function CustomerHeader({ customer }: CustomerHeaderProps) {
   const router = useRouter()
   const [isActive] = useState(true) // TODO: Add customer status to schema if needed
+  const [deleting, setDeleting] = useState(false)
 
   const handleNewJob = () => {
     // TODO: Navigate to job creation with prefilled customerId
@@ -28,6 +29,27 @@ export function CustomerHeader({ customer }: CustomerHeaderProps) {
   const handleAddPayment = () => {
     // TODO: Open payment drawer or navigate to payment page
     router.push(`/dashboard/owner/customers/${customer.id}/billing`)
+  }
+
+  const handleDeleteCustomer = async () => {
+    const confirmed = window.confirm('Delete this customer? This action cannot be undone.')
+    if (!confirmed) return
+
+    try {
+      setDeleting(true)
+      const response = await fetch(`/api/customers/${customer.id}`, {
+        method: 'DELETE',
+      })
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to delete customer')
+      }
+      router.push('/dashboard/owner/customers')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'Failed to delete customer')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   return (
@@ -95,6 +117,16 @@ export function CustomerHeader({ customer }: CustomerHeaderProps) {
           >
             <CreditCard className="h-4 w-4 mr-1" />
             Add Payment
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={handleDeleteCustomer}
+            disabled={deleting}
+            className="w-full sm:w-auto"
+          >
+            <Trash className="h-4 w-4 mr-1" />
+            {deleting ? 'Deleting...' : 'Delete Customer'}
           </Button>
         </div>
       </div>

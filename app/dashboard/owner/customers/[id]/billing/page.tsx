@@ -323,7 +323,7 @@ export default function CustomerBillingPage({ params }: PageProps) {
           {/* Invoices List */}
           <div className="rounded-lg border p-6 bg-white dark:bg-gray-800">
             <h2 className="text-lg font-semibold mb-4">Invoices</h2>
-            <InvoicesList invoices={invoices} loading={invoicesLoading} />
+            <InvoicesList invoices={invoices} loading={invoicesLoading} onRefresh={refreshAllData} />
           </div>
         </>
       )}

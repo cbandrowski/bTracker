@@ -49,21 +49,22 @@ export default function BillingPage() {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold guild-heading">Billing Overview</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Manage invoices, payments, and customer balances
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={handleRefresh}
             disabled={billingStats.loading || recentInvoices.loading || customersBalance.loading}
+            className="w-full sm:w-auto"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${
               (billingStats.loading || recentInvoices.loading || customersBalance.loading) ? 'animate-spin' : ''
@@ -72,6 +73,7 @@ export default function BillingPage() {
           </Button>
           <Button
             onClick={() => router.push('/dashboard/owner/billing/customers')}
+            className="w-full sm:w-auto"
           >
             <Plus className="h-4 w-4 mr-2" />
             New Invoice
@@ -105,7 +107,7 @@ export default function BillingPage() {
       </div>
 
       {/* Two Column Layout - Side by side on all screen sizes */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-6">
         {/* Recent Invoices */}
         <div className="rounded-lg border-border p-3 sm:p-6 glass-surface">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 sm:mb-4 gap-2">

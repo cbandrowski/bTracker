@@ -1,6 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { Customer, CustomerJob, CustomerInvoice, CustomerPayment, CustomerStats } from '@/types/customer-details'
+import { CustomerServiceAddress } from '@/types/database'
 import { CustomerHeader } from './CustomerHeader'
 import { CustomerInfoPanel } from './CustomerInfoPanel'
 import { CustomerStatsGrid } from './CustomerStatsGrid'
@@ -12,6 +14,7 @@ interface CustomerDetailsClientProps {
   invoices: CustomerInvoice[]
   payments: CustomerPayment[]
   stats: CustomerStats
+  serviceAddresses: CustomerServiceAddress[]
 }
 
 export function CustomerDetailsClient({
@@ -20,7 +23,22 @@ export function CustomerDetailsClient({
   invoices,
   payments,
   stats,
+  serviceAddresses,
 }: CustomerDetailsClientProps) {
+  const [addresses, setAddresses] = useState<CustomerServiceAddress[]>(serviceAddresses)
+
+  const handleAddressAdded = (addr: CustomerServiceAddress) => {
+    setAddresses((prev) => [...prev, addr])
+  }
+
+  const handleAddressUpdated = (addr: CustomerServiceAddress) => {
+    setAddresses((prev) => prev.map((a) => (a.id === addr.id ? addr : a)))
+  }
+
+  const handleAddressDeleted = (id: string) => {
+    setAddresses((prev) => prev.filter((a) => a.id !== id))
+  }
+
   return (
     <>
       {/* Header */}
@@ -29,8 +47,14 @@ export function CustomerDetailsClient({
       {/* Two-column layout on desktop, stacked on mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Customer Info */}
-        <div className="lg:col-span-1" id="customer-info-panel">
-          <CustomerInfoPanel customer={customer} />
+        <div className="lg:col-span-1 space-y-4" id="customer-info-panel">
+          <CustomerInfoPanel
+            customer={customer}
+            serviceAddresses={addresses}
+            onAddressCreated={handleAddressAdded}
+            onAddressUpdated={handleAddressUpdated}
+            onAddressDeleted={handleAddressDeleted}
+          />
         </div>
 
         {/* Right: Stats Grid */}

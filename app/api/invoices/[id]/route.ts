@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import { UpdateInvoiceSchema } from '@/lib/schemas/billing'
+import { deleteInvoice, updateInvoice } from '@/lib/services/invoices'
+import { ZodError } from 'zod'
 
 export async function GET(
   request: NextRequest,
@@ -166,5 +169,72 @@ export async function GET(
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: invoiceId } = await params
+    const supabase = await createServerClient()
+    const user = await getCurrentUser(supabase)
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const companyIds = await getUserCompanyIds(supabase, user.id)
+    if (companyIds.length === 0) {
+      return NextResponse.json({ error: 'No company found' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const validated = UpdateInvoiceSchema.parse(body)
+
+    const updated = await updateInvoice(supabase, invoiceId, companyIds, user.id, validated)
+    return NextResponse.json(updated)
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.issues },
+        { status: 422 }
+      )
+    }
+    console.error('Error updating invoice:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: invoiceId } = await params
+    const supabase = await createServerClient()
+    const user = await getCurrentUser(supabase)
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const companyIds = await getUserCompanyIds(supabase, user.id)
+    if (companyIds.length === 0) {
+      return NextResponse.json({ error: 'No company found' }, { status: 403 })
+    }
+
+    const result = await deleteInvoice(supabase, invoiceId, companyIds, user.id)
+    return NextResponse.json(result)
+  } catch (error) {
+    console.error('Error deleting invoice:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Internal server error' },
+      { status: 500 }
+    )
   }
 }

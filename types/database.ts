@@ -60,6 +60,9 @@ export interface CompanyOwner {
 export type EmploymentStatus = 'active' | 'terminated' | 'on_leave'
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 export type WorkStatus = 'available' | 'inactive' | 'vacation' | 'sick'
+export type InvoiceStatus = 'draft' | 'issued' | 'partial' | 'paid' | 'void' | 'cancelled'
+export type InvoiceAuditAction = 'edit' | 'delete'
+export type CountryCode = 'USA' | string
 
 export interface CompanyEmployee {
   id: string  // uuid
@@ -102,6 +105,23 @@ export interface Customer {
 
   same_as_billing: boolean
   notes: string | null
+  archived: boolean
+  archived_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CustomerServiceAddress {
+  id: string
+  customer_id: string
+  company_id: string
+  label: string
+  address: string | null
+  address_line_2: string | null
+  city: string | null
+  state: string | null
+  zipcode: string | null
+  country: CountryCode | null
   created_at: string
   updated_at: string
 }
@@ -283,4 +303,37 @@ export interface EmployeeAvailability {
   end_time: string | null
   created_at: string
   updated_at: string
+}
+
+export interface InvoiceAuditDiffLine {
+  line_type: string
+  description: string | null
+  quantity: number
+  unit_price: number
+  tax_rate: number
+  applied_payment_id: string | null
+}
+
+export interface InvoiceAuditSnapshot {
+  status: InvoiceStatus
+  invoice_date: string | null
+  due_date: string | null
+  terms: string | null
+  notes: string | null
+  total_amount: number
+  balance_due: number
+  lines: InvoiceAuditDiffLine[]
+}
+
+export interface InvoiceAuditLog {
+  id: string
+  invoice_id: string
+  company_id: string
+  user_id: string | null
+  action: InvoiceAuditAction
+  diff: {
+    before?: InvoiceAuditSnapshot
+    after?: InvoiceAuditSnapshot
+  } | null
+  created_at: string
 }

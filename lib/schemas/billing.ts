@@ -62,6 +62,45 @@ export const IssueInvoiceSchema = z.object({
   terms: z.string().max(200).nullable().optional(),
 })
 
+const InvoiceUpdateLineSchema = z.object({
+  description: z.string().min(1, 'Description is required').max(500),
+  quantity: z.number().positive('Quantity must be greater than 0'),
+  unitPrice: z.number(),
+  taxRate: z.number().min(0).max(100).default(0),
+  lineType: z.enum(['service', 'parts', 'supplies', 'labor', 'deposit_applied', 'adjustment', 'other']),
+  jobId: z.string().uuid().nullable().optional(),
+  appliedPaymentId: z.string().uuid().nullable().optional(),
+}).superRefine((val, ctx) => {
+  if (val.lineType === 'deposit_applied') {
+    if (!val.appliedPaymentId) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Deposit application requires a payment id',
+      })
+    }
+    if (val.unitPrice >= 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'Deposit application amount must be negative',
+      })
+    }
+  } else if (val.appliedPaymentId) {
+    ctx.addIssue({
+      code: 'custom',
+      message: 'appliedPaymentId is only valid for deposit_applied lines',
+    })
+  }
+})
+
+export const UpdateInvoiceSchema = z.object({
+  invoiceDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (use YYYY-MM-DD)').optional(),
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Invalid date format (use YYYY-MM-DD)').nullable().optional(),
+  terms: z.string().max(200).nullable().optional(),
+  notes: z.string().max(1000).nullable().optional(),
+  status: z.enum(['draft', 'issued', 'partial', 'paid', 'cancelled', 'void']).optional(),
+  lines: z.array(InvoiceUpdateLineSchema).min(1, 'At least one line is required'),
+})
+
 // ============================================================================
 // PAYMENT APPLICATION SCHEMA
 // ============================================================================
@@ -99,5 +138,6 @@ export type CreatePaymentInput = z.infer<typeof CreatePaymentSchema>
 export type EditPaymentInput = z.infer<typeof EditPaymentSchema>
 export type CreateInvoiceInput = z.infer<typeof CreateInvoiceSchema>
 export type IssueInvoiceInput = z.infer<typeof IssueInvoiceSchema>
+export type UpdateInvoiceInput = z.infer<typeof UpdateInvoiceSchema>
 export type CreatePaymentApplicationInput = z.infer<typeof CreatePaymentApplicationSchema>
 export type PaymentsIndexQuery = z.infer<typeof PaymentsIndexQuerySchema>

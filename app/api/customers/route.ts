@@ -1,9 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
 
+type CustomerStatus = 'active' | 'archived' | 'all'
+
 // GET /api/customers - List all customers for user's companies
 export async function GET(request: NextRequest) {
   try {
+    const searchParams = request.nextUrl.searchParams
+    const statusParam = searchParams.get('status')
+    const status: CustomerStatus =
+      statusParam === 'archived' ? 'archived' : statusParam === 'all' ? 'all' : 'active'
+
     const supabase = await createServerClient()
     const user = await getCurrentUser(supabase)
 
@@ -17,11 +24,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([])
     }
 
-    const { data, error } = await supabase
+    let query = supabase
       .from('customers')
       .select('*')
       .in('company_id', companyIds)
-      .order('created_at', { ascending: false })
+
+    if (status !== 'all') {
+      query = query.eq('archived', status === 'archived')
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false })
 
     if (error) {
       console.error('Error fetching customers:', error)

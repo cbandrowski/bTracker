@@ -116,6 +116,13 @@ async function getCustomerDetails(customerId: string) {
     amount: Number(p.amount),
   }))
 
+  const { data: serviceAddresses } = await supabase
+    .from('customer_service_addresses')
+    .select('*')
+    .eq('customer_id', customerId)
+    .in('company_id', companyIds)
+    .order('created_at', { ascending: true })
+
   // Calculate stats
   const totalJobs = transformedJobs.length
   const openJobs = transformedJobs.filter(j =>
@@ -167,6 +174,7 @@ async function getCustomerDetails(customerId: string) {
     invoices: transformedInvoices,
     payments: transformedPayments,
     stats,
+    serviceAddresses: serviceAddresses || [],
   }
 }
 
@@ -187,6 +195,7 @@ export default async function CustomerDetailsPage({ params }: PageProps) {
           invoices={data.invoices}
           payments={data.payments}
           stats={data.stats}
+          serviceAddresses={data.serviceAddresses}
         />
       </div>
     </div>

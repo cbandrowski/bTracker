@@ -305,7 +305,7 @@ export function InlineInvoiceForm({
     <Card className="border-2">
       <CardHeader className="border-b bg-gray-50 dark:bg-gray-900 pb-6">
         {/* Invoice Header */}
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div className="space-y-1">
             <h2 className="text-3xl font-bold text-gray-900 dark:text-white">INVOICE</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400">Draft</p>
@@ -313,17 +313,17 @@ export function InlineInvoiceForm({
 
           {/* Company Information */}
           {companyInfo && (
-            <div className="text-right space-y-1">
-              <div className="font-bold text-lg">{companyInfo.name}</div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">
-                <div>{companyInfo.address}</div>
-                {companyInfo.address_line_2 && <div>{companyInfo.address_line_2}</div>}
-                <div>
+            <div className="text-left sm:text-right space-y-1">
+              <div className="font-bold text-lg break-words">{companyInfo.name}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 space-y-0.5">
+                <div className="break-words">{companyInfo.address}</div>
+                {companyInfo.address_line_2 && <div className="break-words">{companyInfo.address_line_2}</div>}
+                <div className="break-words">
                   {companyInfo.city}, {companyInfo.state} {companyInfo.zipcode}
                 </div>
-                <div className="mt-2">
-                  <div>{companyInfo.phone}</div>
-                  <div>{companyInfo.email}</div>
+                <div className="mt-2 space-y-0.5">
+                  <div className="break-words">{companyInfo.phone}</div>
+                  <div className="break-words">{companyInfo.email}</div>
                 </div>
               </div>
             </div>
@@ -354,7 +354,7 @@ export function InlineInvoiceForm({
 
         {/* Invoice Lines Table */}
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <Label className="text-lg font-semibold">Invoice Lines</Label>
             <Button onClick={addManualLine} size="sm" variant="outline">
               <Plus className="mr-2 h-4 w-4" />
@@ -370,88 +370,96 @@ export function InlineInvoiceForm({
             </div>
           ) : (
             <div className="border rounded-lg overflow-hidden">
-              {/* Table Header */}
-              <div className="grid grid-cols-12 gap-4 bg-gray-100 dark:bg-gray-800 p-3 text-sm font-semibold border-b">
-                <div className="col-span-4">Description / Notes</div>
-                <div className="col-span-2">Completed</div>
-                <div className="col-span-2 text-center">Qty</div>
-                <div className="col-span-2 text-right">Unit Price</div>
-                <div className="col-span-1 text-right">Subtotal</div>
-                <div className="col-span-1"></div>
-              </div>
-
-              {/* Table Rows */}
-              {invoiceLines.map((line, index) => (
-                <div
-                  key={line.id}
-                  className={`grid grid-cols-12 gap-4 p-3 items-start ${
-                    index !== invoiceLines.length - 1 ? 'border-b' : ''
-                  }`}
-                >
-                  {/* Description / Notes */}
-                  <div className="col-span-4 space-y-2">
-                    <Input
-                      placeholder="Description *"
-                      value={line.description}
-                      onChange={e => updateLine(line.id, { description: e.target.value })}
-                      className="font-medium"
-                    />
-                    <Textarea
-                      placeholder="Notes (optional)"
-                      value={line.notes}
-                      onChange={e => updateLine(line.id, { notes: e.target.value })}
-                      rows={2}
-                      className="text-sm"
-                    />
+              <div className="overflow-x-auto">
+                <div className="min-w-full sm:min-w-[760px]">
+                  {/* Table Header */}
+                  <div className="grid grid-cols-1 sm:grid-cols-12 gap-4 bg-gray-100 dark:bg-gray-800 p-3 text-sm font-semibold border-b">
+                    <div className="sm:col-span-4">Description / Notes</div>
+                    <div className="sm:col-span-2 hidden sm:block">Completed</div>
+                    <div className="sm:col-span-2 hidden sm:block text-center">Qty</div>
+                    <div className="sm:col-span-2 hidden sm:block text-right">Unit Price</div>
+                    <div className="sm:col-span-1 hidden sm:block text-right">Subtotal</div>
+                    <div className="sm:col-span-1 hidden sm:block" />
                   </div>
 
-                  {/* Completed Date */}
-                  <div className="col-span-2 flex items-center text-sm text-gray-600 dark:text-gray-400">
-                    {formatDate(line.completedAt)}
-                  </div>
-
-                  {/* Quantity */}
-                  <div className="col-span-2">
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={line.quantityInput}
-                      onChange={e => updateLine(line.id, { quantityInput: e.target.value })}
-                      className="text-center"
-                      placeholder="0"
-                    />
-                  </div>
-
-                  {/* Unit Price */}
-                  <div className="col-span-2">
-                    <Input
-                      type="text"
-                      inputMode="decimal"
-                      value={line.unitPriceInput}
-                      onChange={e => updateLine(line.id, { unitPriceInput: e.target.value })}
-                      placeholder="0.00"
-                      className="text-right"
-                    />
-                  </div>
-
-                  {/* Subtotal */}
-                  <div className="col-span-1 flex items-center justify-end text-sm font-medium">
-                    {formatCurrency(line.subtotal)}
-                  </div>
-
-                  {/* Delete Button */}
-                  <div className="col-span-1 flex items-start justify-center">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeLine(line.id)}
-                      className="h-8 w-8 p-0"
+                  {/* Table Rows */}
+                  {invoiceLines.map((line, index) => (
+                    <div
+                      key={line.id}
+                      className={`grid grid-cols-1 sm:grid-cols-12 gap-4 p-3 items-start ${
+                        index !== invoiceLines.length - 1 ? 'border-b' : ''
+                      }`}
                     >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
+                      {/* Description / Notes */}
+                      <div className="sm:col-span-4 space-y-2">
+                        <Input
+                          placeholder="Description *"
+                          value={line.description}
+                          onChange={e => updateLine(line.id, { description: e.target.value })}
+                          className="font-medium"
+                        />
+                        <Textarea
+                          placeholder="Notes (optional)"
+                          value={line.notes}
+                          onChange={e => updateLine(line.id, { notes: e.target.value })}
+                          rows={2}
+                          className="text-sm"
+                        />
+                      </div>
+
+                      {/* Completed Date */}
+                      <div className="sm:col-span-2 flex sm:items-center justify-between sm:justify-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 sm:hidden">Completed</span>
+                        <span>{formatDate(line.completedAt)}</span>
+                      </div>
+
+                      {/* Quantity */}
+                      <div className="sm:col-span-2 space-y-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 sm:hidden">Quantity</p>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={line.quantityInput}
+                          onChange={e => updateLine(line.id, { quantityInput: e.target.value })}
+                          className="text-center"
+                          placeholder="0"
+                        />
+                      </div>
+
+                      {/* Unit Price */}
+                      <div className="sm:col-span-2 space-y-1">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 sm:hidden">Unit Price</p>
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          value={line.unitPriceInput}
+                          onChange={e => updateLine(line.id, { unitPriceInput: e.target.value })}
+                          placeholder="0.00"
+                          className="text-right"
+                        />
+                      </div>
+
+                      {/* Subtotal */}
+                      <div className="sm:col-span-1 flex flex-col sm:flex-row sm:items-center sm:justify-end text-sm font-medium gap-1">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 sm:hidden">Subtotal</span>
+                        <span>{formatCurrency(line.subtotal)}</span>
+                      </div>
+
+                      {/* Delete Button */}
+                      <div className="sm:col-span-1 flex items-start justify-start sm:justify-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeLine(line.id)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
           )}
         </div>
@@ -656,20 +664,20 @@ export function InlineInvoiceForm({
         </div>
 
         {/* Action Buttons */}
-        <div className="flex items-center gap-3 pt-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 pt-4">
           <Button
             variant="outline"
             onClick={handlePreview}
             disabled={!canSubmit || submitting}
-            className="flex-1"
+            className="w-full sm:flex-1"
           >
             <Eye className="h-4 w-4 mr-2" />
             Preview Invoice
           </Button>
-          <Button onClick={handleSubmit} disabled={!canSubmit || submitting} className="flex-1">
+          <Button onClick={handleSubmit} disabled={!canSubmit || submitting} className="w-full sm:flex-1">
             {submitting ? 'Creating Invoice...' : 'Create Invoice'}
           </Button>
-          <Button variant="outline" onClick={onCancel} disabled={submitting} className="flex-1">
+          <Button variant="outline" onClick={onCancel} disabled={submitting} className="w-full sm:flex-1">
             Cancel
           </Button>
         </div>

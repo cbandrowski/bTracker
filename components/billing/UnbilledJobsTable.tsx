@@ -87,63 +87,65 @@ export function UnbilledJobsTable({ jobs, loading }: UnbilledJobsTableProps) {
   }
 
   return (
-    <div className="rounded-md border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Job</TableHead>
-            <TableHead>Customer</TableHead>
-            <TableHead>Contact</TableHead>
-            <TableHead>Completed Date</TableHead>
-            <TableHead className="text-right">Est. Amount</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {jobs.map((job) => (
-            <TableRow
-              key={job.id}
-              className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-              onClick={() => handleRowClick(job.customer_id)}
-            >
-              <TableCell>
-                <div>
-                  <div className="font-medium">{job.title}</div>
-                  {job.description && (
-                    <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
-                      {job.description}
-                    </div>
-                  )}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="font-medium text-blue-600 dark:text-blue-400">
-                  {job.customer_name}
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="flex flex-col text-sm">
-                  <span className="text-gray-900 dark:text-gray-100">
-                    {job.customer_email || '-'}
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400">
-                    {formatPhoneNumber(job.customer_phone)}
-                  </span>
-                </div>
-              </TableCell>
-              <TableCell>
-                <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {formatDate(job.completed_at)}
-                </div>
-              </TableCell>
-              <TableCell className="text-right">
-                <Badge variant="outline" className="font-mono">
-                  {formatCurrency(job.estimated_amount)}
-                </Badge>
-              </TableCell>
+    <div className="rounded-md border overflow-hidden">
+      <div className="overflow-x-auto">
+        <Table className="min-w-[720px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead>Job</TableHead>
+              <TableHead>Customer</TableHead>
+              <TableHead>Contact</TableHead>
+              <TableHead>Completed Date</TableHead>
+              <TableHead className="text-right">Est. Amount</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {jobs.map((job) => (
+              <TableRow
+                key={job.id}
+                className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                onClick={() => handleRowClick(job.customer_id)}
+              >
+                <TableCell>
+                  <div>
+                    <div className="font-medium">{job.title}</div>
+                    {job.description && (
+                      <div className="text-sm text-gray-500 dark:text-gray-400 line-clamp-1">
+                        {job.description}
+                      </div>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="font-medium text-blue-600 dark:text-blue-400">
+                    {job.customer_name}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col text-sm">
+                    <span className="text-gray-900 dark:text-gray-100">
+                      {job.customer_email || '-'}
+                    </span>
+                    <span className="text-gray-500 dark:text-gray-400">
+                      {formatPhoneNumber(job.customer_phone)}
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {formatDate(job.completed_at)}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <Badge variant="outline" className="font-mono">
+                    {formatCurrency(job.estimated_amount)}
+                  </Badge>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   )
 }

@@ -1,6 +1,7 @@
 /**
  * Type definitions for Customer Details view
  */
+import { CustomerServiceAddress } from './database'
 
 export interface Customer {
   id: string
@@ -102,6 +103,7 @@ export interface CustomerDetailsData {
   invoices: CustomerInvoice[]
   payments: CustomerPayment[]
   stats: CustomerStats
+  serviceAddresses: CustomerServiceAddress[]
 }
 
 export interface UpdateCustomerInput {

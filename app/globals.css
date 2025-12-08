@@ -216,3 +216,84 @@ select:focus {
     display: none !important;
   }
 }
+
+/* Google Maps Autocomplete styling */
+.pac-container {
+  background-color: white;
+  z-index: 9999 !important;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  margin-top: 4px;
+  font-family: inherit;
+}
+
+.pac-container:after {
+  display: none;
+}
+
+.pac-item {
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.5;
+  border-top: 1px solid #f3f4f6;
+}
+
+.pac-item:first-child {
+  border-top: none;
+}
+
+.pac-item:hover {
+  background-color: #f9fafb;
+}
+
+.pac-item-selected,
+.pac-item-selected:hover {
+  background-color: #f3f4f6;
+}
+
+.pac-icon {
+  display: none;
+}
+
+.pac-item-query {
+  font-size: 14px;
+  color: #111827;
+  font-weight: 500;
+}
+
+.pac-matched {
+  font-weight: 600;
+  color: #6366f1;
+}
+
+/* Dark mode for Google autocomplete */
+@media (prefers-color-scheme: dark) {
+  .pac-container {
+    background-color: #1f2937;
+    border-color: #374151;
+  }
+
+  .pac-item {
+    border-top-color: #374151;
+    color: #f3f4f6;
+  }
+
+  .pac-item:hover {
+    background-color: #374151;
+  }
+
+  .pac-item-selected,
+  .pac-item-selected:hover {
+    background-color: #4b5563;
+  }
+
+  .pac-item-query {
+    color: #f3f4f6;
+  }
+
+  .pac-matched {
+    color: #818cf8;
+  }
+}

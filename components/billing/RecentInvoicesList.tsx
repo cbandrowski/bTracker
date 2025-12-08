@@ -78,7 +78,7 @@ export function RecentInvoicesList({ invoices, loading }: RecentInvoicesListProp
       {invoices.map((invoice) => (
         <div
           key={invoice.id}
-          className="flex items-center justify-between p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 transition-colors"
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg border border-gray-200 hover:border-gray-300 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800 transition-colors"
         >
           <div className="flex items-center gap-3">
             <span className="font-medium text-gray-900 dark:text-gray-100">
@@ -89,7 +89,7 @@ export function RecentInvoicesList({ invoices, loading }: RecentInvoicesListProp
             </Badge>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto">
             <div className="text-sm text-gray-500 dark:text-gray-400">
               Due: <span className="font-medium text-gray-900 dark:text-gray-100">{formatDate(invoice.due_date)}</span>
             </div>
