@@ -123,6 +123,7 @@ export function ServiceAddressModal({
       }
 
       if (response.error) throw new Error(response.error)
+      if (!response.data) throw new Error('No data returned from server')
 
       toast({
         variant: 'success',
