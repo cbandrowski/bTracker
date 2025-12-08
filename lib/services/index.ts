@@ -2,7 +2,7 @@
 // Provides type-safe methods for all backend API routes
 
 import { api } from '../api'
-import { Customer, Job, JobAssignment, CompanyEmployee, Company, JobWithCustomer, Profile, InvoiceStatus } from '@/types/database'
+import { Customer, Job, JobAssignment, CompanyEmployee, Company, JobWithCustomer, Profile, InvoiceStatus, CustomerServiceAddress } from '@/types/database'
 
 type CustomerStatus = 'active' | 'archived' | 'all'
 
@@ -78,13 +78,13 @@ export const customersService = {
 
 export const customerAddressesService = {
   async list(customerId: string) {
-    return api.get(`/customers/${customerId}/service-addresses`)
+    return api.get<CustomerServiceAddress[]>(`/customers/${customerId}/service-addresses`)
   },
   async create(customerId: string, payload: CustomerServiceAddressPayload) {
-    return api.post(`/customers/${customerId}/service-addresses`, payload)
+    return api.post<CustomerServiceAddress>(`/customers/${customerId}/service-addresses`, payload)
   },
   async update(customerId: string, addressId: string, payload: CustomerServiceAddressPayload) {
-    return api.put(`/customers/${customerId}/service-addresses/${addressId}`, payload)
+    return api.put<CustomerServiceAddress>(`/customers/${customerId}/service-addresses/${addressId}`, payload)
   },
   async delete(customerId: string, addressId: string) {
     return api.delete<{ success: boolean }>(`/customers/${customerId}/service-addresses/${addressId}`)
@@ -195,9 +195,20 @@ export const companiesService = {
 // INVOICES SERVICE
 // ============================================================================
 
+export interface InvoiceUpdateResponse {
+  invoiceId: string
+  invoiceNumber: string
+  summary: {
+    subtotal: number
+    tax: number
+    total: number
+    balance: number
+  }
+}
+
 export const invoicesService = {
   async update(id: string, payload: UpdateInvoicePayload) {
-    return api.patch(`/invoices/${id}`, payload)
+    return api.patch<InvoiceUpdateResponse>(`/invoices/${id}`, payload)
   },
   async delete(id: string) {
     return api.delete<{ success: boolean }>(`/invoices/${id}`)
