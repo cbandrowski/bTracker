@@ -42,6 +42,8 @@ export interface CustomerJob {
   tasks_to_complete: string | null
   status: 'upcoming' | 'in_progress' | 'done' | 'cancelled'
   planned_end_date: string | null
+  arrival_window_start_time: string | null
+  arrival_window_end_time: string | null
   created_at: string
   updated_at: string
   completed_at: string | null

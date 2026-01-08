@@ -1,5 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import {
+  deleteAssignmentForOwner,
+  getAssignmentForOwner,
+  ServiceError,
+  updateAssignmentStatusForOwnerEmployee,
+} from '@/lib/services/assignments'
+
+const AssignmentIdSchema = z.string().uuid()
+const UpdateAssignmentStatusSchema = z.object({
+  assignment_status: z.enum(['assigned', 'in_progress', 'done']),
+})
 
 // GET /api/assignments/[id] - Get a single assignment
 export async function GET(
@@ -8,6 +20,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params
+    const assignmentId = AssignmentIdSchema.parse(id)
     const supabase = await createServerClient()
     const user = await getCurrentUser(supabase)
 
@@ -16,31 +29,27 @@ export async function GET(
     }
 
     const companyIds = await getUserCompanyIds(supabase, user.id)
-
-    const { data, error } = await supabase
-      .from('job_assignments')
-      .select(`
-        *,
-        job:jobs(
-          *,
-          customer:customers(*)
-        ),
-        employee:company_employees(
-          *,
-          profile:profiles(*)
-        )
-      `)
-      .eq('id', id)
-      .in('company_id', companyIds)
-      .single()
-
-    if (error) {
-      console.error('Error fetching assignment:', error)
-      return NextResponse.json({ error: error.message }, { status: 404 })
+    if (companyIds.length === 0) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    return NextResponse.json(data)
+    const assignment = await getAssignmentForOwner(supabase, user.id, assignmentId)
+
+    if (!assignment) {
+      return NextResponse.json({ error: 'Assignment not found' }, { status: 404 })
+    }
+
+    return NextResponse.json(assignment)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.issues },
+        { status: 422 }
+      )
+    }
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
     console.error('Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -56,6 +65,7 @@ export async function PATCH(
 ) {
   try {
     const { id } = await params
+    const assignmentId = AssignmentIdSchema.parse(id)
     const supabase = await createServerClient()
     const user = await getCurrentUser(supabase)
 
@@ -63,52 +73,31 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
     const companyIds = await getUserCompanyIds(supabase, user.id)
-
-    // Verify assignment belongs to user's company
-    const { data: existing } = await supabase
-      .from('job_assignments')
-      .select('company_id')
-      .eq('id', id)
-      .single()
-
-    if (!existing || !companyIds.includes(existing.company_id)) {
+    if (companyIds.length === 0) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    // Add timestamp for done status
-    const updateData = {
-      ...body,
-      ...(body.assignment_status === 'done' && !body.worker_confirmed_done_at ? {
-        worker_confirmed_done_at: new Date().toISOString()
-      } : {})
-    }
+    const body = UpdateAssignmentStatusSchema.parse(await request.json())
 
-    const { data, error } = await supabase
-      .from('job_assignments')
-      .update(updateData)
-      .eq('id', id)
-      .select(`
-        *,
-        job:jobs(
-          *,
-          customer:customers(*)
-        ),
-        employee:company_employees(
-          *,
-          profile:profiles(*)
-        )
-      `)
-      .single()
+    const updated = await updateAssignmentStatusForOwnerEmployee(
+      supabase,
+      user.id,
+      assignmentId,
+      body.assignment_status
+    )
 
-    if (error) {
-      console.error('Error updating assignment:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
+    return NextResponse.json(updated)
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.issues },
+        { status: 422 }
+      )
+    }
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
     console.error('Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -124,6 +113,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params
+    const assignmentId = AssignmentIdSchema.parse(id)
     const supabase = await createServerClient()
     const user = await getCurrentUser(supabase)
 
@@ -132,27 +122,23 @@ export async function DELETE(
     }
 
     const companyIds = await getUserCompanyIds(supabase, user.id)
-
-    // Verify assignment belongs to user's company
-    const { data: existing } = await supabase
-      .from('job_assignments')
-      .select('company_id')
-      .eq('id', id)
-      .single()
-
-    if (!existing || !companyIds.includes(existing.company_id)) {
+    if (companyIds.length === 0) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const { error } = await supabase.from('job_assignments').delete().eq('id', id)
-
-    if (error) {
-      console.error('Error deleting assignment:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
+    await deleteAssignmentForOwner(supabase, user.id, assignmentId)
 
     return NextResponse.json({ success: true })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.issues },
+        { status: 422 }
+      )
+    }
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
     console.error('Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

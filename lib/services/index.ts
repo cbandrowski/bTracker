@@ -2,7 +2,7 @@
 // Provides type-safe methods for all backend API routes
 
 import { api } from '../api'
-import { Customer, Job, JobAssignment, CompanyEmployee, Company, JobWithCustomer, Profile, InvoiceStatus, CustomerServiceAddress } from '@/types/database'
+import { AssignmentStatus, Company, CompanyEmployee, Customer, CustomerServiceAddress, InvoiceStatus, Job, JobAssignment, JobWithCustomer, Profile } from '@/types/database'
 
 type CustomerStatus = 'active' | 'archived' | 'all'
 
@@ -128,7 +128,11 @@ export const jobsService = {
 
 interface AssignmentWithDetails extends JobAssignment {
   job?: JobWithCustomer
-  employee?: CompanyEmployee & { profile?: any }
+  employee?: CompanyEmployee & { profile?: Profile | null }
+}
+
+type AssignmentCreateInput = Omit<JobAssignment, 'id' | 'created_at' | 'updated_at' | 'assignment_status'> & {
+  assignment_status?: AssignmentStatus
 }
 
 export const assignmentsService = {
@@ -143,7 +147,7 @@ export const assignmentsService = {
   },
 
   // Create a new assignment
-  async create(assignmentData: Omit<JobAssignment, 'id' | 'created_at' | 'updated_at'>) {
+  async create(assignmentData: AssignmentCreateInput) {
     return api.post<AssignmentWithDetails>('/assignments', assignmentData)
   },
 
@@ -158,7 +162,7 @@ export const assignmentsService = {
   },
 
   // Convenience method for changing status
-  async changeStatus(id: string, status: 'assigned' | 'in_progress' | 'done' | 'cancelled') {
+  async changeStatus(id: string, status: AssignmentStatus) {
     return this.update(id, { assignment_status: status })
   },
 }
@@ -170,7 +174,7 @@ export const assignmentsService = {
 export const employeesService = {
   // Get all employees
   async getAll() {
-    return api.get<(CompanyEmployee & { profile?: any })[]>('/employees')
+    return api.get<(CompanyEmployee & { profile?: Profile | null })[]>('/employees')
   },
 
   async getById(id: string) {

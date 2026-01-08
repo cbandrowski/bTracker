@@ -26,6 +26,325 @@ export default function InvoiceViewPage({ params }: PageProps) {
   const [paymentApplications, setPaymentApplications] = useState<any[]>([])
   const [downloadingPDF, setDownloadingPDF] = useState(false)
   const invoiceRef = useRef<HTMLDivElement>(null)
+  const PDF_BACKGROUND_COLOR = '#ffffff'
+  const PDF_TEXT_COLOR = '#000000'
+  const PDF_PAGE_WIDTH_PX = 816
+
+  const TAILWIND_COLOR_VARIABLES = [
+    '--color-white',
+    '--color-black',
+    '--color-gray-50',
+    '--color-gray-100',
+    '--color-gray-200',
+    '--color-gray-300',
+    '--color-gray-400',
+    '--color-gray-500',
+    '--color-gray-600',
+    '--color-gray-700',
+    '--color-gray-800',
+    '--color-gray-900',
+    '--color-blue-50',
+    '--color-blue-100',
+    '--color-blue-200',
+    '--color-blue-400',
+    '--color-blue-600',
+    '--color-blue-800',
+    '--color-blue-900',
+    '--color-green-50',
+    '--color-green-100',
+    '--color-green-200',
+    '--color-green-400',
+    '--color-green-600',
+    '--color-green-800',
+    '--color-green-900',
+    '--color-yellow-200',
+    '--color-yellow-100',
+    '--color-yellow-800',
+    '--color-yellow-900',
+    '--color-red-200',
+    '--color-red-100',
+    '--color-red-800',
+    '--color-red-900',
+  ]
+
+  const clamp = (value: number, min = 0, max = 1) => {
+    return Math.min(max, Math.max(min, value))
+  }
+
+  const parseCssNumber = (token: string) => {
+    const match = token.trim().match(/^([-+]?\d*\.?\d+)([a-z%]*)$/i)
+    if (!match) {
+      return { value: Number.NaN, unit: '' }
+    }
+    return { value: Number.parseFloat(match[1]), unit: match[2].toLowerCase() }
+  }
+
+  const parseAlphaValue = (token?: string) => {
+    if (!token) {
+      return 1
+    }
+    const { value, unit } = parseCssNumber(token)
+    if (!Number.isFinite(value)) {
+      return 1
+    }
+    if (unit === '%') {
+      return clamp(value / 100)
+    }
+    return clamp(value)
+  }
+
+  const parseHueValue = (token: string) => {
+    const { value, unit } = parseCssNumber(token)
+    if (!Number.isFinite(value)) {
+      return 0
+    }
+    switch (unit) {
+      case 'rad':
+        return (value * 180) / Math.PI
+      case 'turn':
+        return value * 360
+      case 'grad':
+        return value * 0.9
+      default:
+        return value
+    }
+  }
+
+  const formatRgb = (r: number, g: number, b: number, alpha = 1) => {
+    const red = Math.round(clamp(r) * 255)
+    const green = Math.round(clamp(g) * 255)
+    const blue = Math.round(clamp(b) * 255)
+    const safeAlpha = clamp(alpha)
+    if (safeAlpha < 1) {
+      return `rgba(${red}, ${green}, ${blue}, ${Number(safeAlpha.toFixed(3))})`
+    }
+    return `rgb(${red}, ${green}, ${blue})`
+  }
+
+  const linearToSrgb = (value: number) => {
+    const clamped = clamp(value)
+    return clamped <= 0.0031308
+      ? 12.92 * clamped
+      : 1.055 * Math.pow(clamped, 1 / 2.4) - 0.055
+  }
+
+  const parseFunctionArgs = (value: string, name: string) => {
+    const normalized = value.trim()
+    if (!normalized.toLowerCase().startsWith(`${name}(`)) {
+      return null
+    }
+    const content = normalized.slice(name.length + 1, -1)
+    const [componentsPart, alphaPart] = content.split('/').map(part => part.trim())
+    const components = componentsPart.replace(/,/g, ' ').split(/\s+/).filter(Boolean)
+    return { components, alpha: alphaPart }
+  }
+
+  const parseOklab = (value: string) => {
+    const parsed = parseFunctionArgs(value, 'oklab')
+    if (!parsed || parsed.components.length < 3) {
+      return null
+    }
+    const [lToken, aToken, bToken] = parsed.components
+    const lParsed = parseCssNumber(lToken)
+    let L = lParsed.value
+    if (!Number.isFinite(L)) {
+      return null
+    }
+    if (lParsed.unit === '%') {
+      L = L / 100
+    } else if (L > 1) {
+      L = L / 100
+    }
+    const aParsed = parseCssNumber(aToken)
+    const bParsed = parseCssNumber(bToken)
+    if (!Number.isFinite(aParsed.value) || !Number.isFinite(bParsed.value)) {
+      return null
+    }
+    const a = aParsed.unit === '%' ? aParsed.value / 100 : aParsed.value
+    const b = bParsed.unit === '%' ? bParsed.value / 100 : bParsed.value
+    return { L, a, b, alpha: parseAlphaValue(parsed.alpha) }
+  }
+
+  const parseOklch = (value: string) => {
+    const parsed = parseFunctionArgs(value, 'oklch')
+    if (!parsed || parsed.components.length < 3) {
+      return null
+    }
+    const [lToken, cToken, hToken] = parsed.components
+    const lParsed = parseCssNumber(lToken)
+    let L = lParsed.value
+    if (!Number.isFinite(L)) {
+      return null
+    }
+    if (lParsed.unit === '%') {
+      L = L / 100
+    } else if (L > 1) {
+      L = L / 100
+    }
+    const cParsed = parseCssNumber(cToken)
+    if (!Number.isFinite(cParsed.value)) {
+      return null
+    }
+    const C = cParsed.unit === '%' ? cParsed.value / 100 : cParsed.value
+    const H = parseHueValue(hToken)
+    const a = C * Math.cos((H * Math.PI) / 180)
+    const b = C * Math.sin((H * Math.PI) / 180)
+    return { L, a, b, alpha: parseAlphaValue(parsed.alpha) }
+  }
+
+  const parseLab = (value: string) => {
+    const parsed = parseFunctionArgs(value, 'lab')
+    if (!parsed || parsed.components.length < 3) {
+      return null
+    }
+    const [lToken, aToken, bToken] = parsed.components
+    const lParsed = parseCssNumber(lToken)
+    let L = lParsed.value
+    if (!Number.isFinite(L)) {
+      return null
+    }
+    if (lParsed.unit === '%') {
+      L = L
+    } else if (L <= 1) {
+      L = L * 100
+    }
+    const aParsed = parseCssNumber(aToken)
+    const bParsed = parseCssNumber(bToken)
+    if (!Number.isFinite(aParsed.value) || !Number.isFinite(bParsed.value)) {
+      return null
+    }
+    const a = aParsed.value
+    const b = bParsed.value
+    return { L, a, b, alpha: parseAlphaValue(parsed.alpha) }
+  }
+
+  const oklabToRgb = (L: number, a: number, b: number, alpha: number) => {
+    const l = L + 0.3963377774 * a + 0.2158037573 * b
+    const m = L - 0.1055613458 * a - 0.0638541728 * b
+    const s = L - 0.0894841775 * a - 1.291485548 * b
+
+    const l3 = l * l * l
+    const m3 = m * m * m
+    const s3 = s * s * s
+
+    const rLinear = 4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3
+    const gLinear = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3
+    const bLinear = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.707614701 * s3
+
+    return formatRgb(
+      linearToSrgb(rLinear),
+      linearToSrgb(gLinear),
+      linearToSrgb(bLinear),
+      alpha
+    )
+  }
+
+  const labToRgb = (L: number, a: number, b: number, alpha: number) => {
+    const fy = (L + 16) / 116
+    const fx = a / 500 + fy
+    const fz = fy - b / 200
+
+    const epsilon = 216 / 24389
+    const kappa = 24389 / 27
+
+    const fx3 = fx * fx * fx
+    const fz3 = fz * fz * fz
+
+    const xr = fx3 > epsilon ? fx3 : (116 * fx - 16) / kappa
+    const yr = L > kappa * epsilon ? Math.pow((L + 16) / 116, 3) : L / kappa
+    const zr = fz3 > epsilon ? fz3 : (116 * fz - 16) / kappa
+
+    const X = xr * 0.96422
+    const Y = yr * 1.0
+    const Z = zr * 0.82521
+
+    const xD65 = 0.9554734 * X + -0.0230985 * Y + 0.0632593 * Z
+    const yD65 = -0.0283697 * X + 1.0099956 * Y + 0.0210414 * Z
+    const zD65 = 0.012314 * X + -0.0205077 * Y + 1.3303659 * Z
+
+    const rLinear = 3.2404542 * xD65 - 1.5371385 * yD65 - 0.4985314 * zD65
+    const gLinear = -0.969266 * xD65 + 1.8760108 * yD65 + 0.041556 * zD65
+    const bLinear = 0.0556434 * xD65 - 0.2040259 * yD65 + 1.0572252 * zD65
+
+    return formatRgb(
+      linearToSrgb(rLinear),
+      linearToSrgb(gLinear),
+      linearToSrgb(bLinear),
+      alpha
+    )
+  }
+
+  const normalizeColorValue = (value: string) => {
+    const trimmed = value.trim()
+    if (!trimmed) {
+      return trimmed
+    }
+    const lower = trimmed.toLowerCase()
+    if (lower.includes('color-mix(')) {
+      return '#000000'
+    }
+    if (lower.startsWith('oklch(')) {
+      const parsed = parseOklch(trimmed)
+      if (parsed) {
+        return oklabToRgb(parsed.L, parsed.a, parsed.b, parsed.alpha)
+      }
+    }
+    if (lower.startsWith('oklab(')) {
+      const parsed = parseOklab(trimmed)
+      if (parsed) {
+        return oklabToRgb(parsed.L, parsed.a, parsed.b, parsed.alpha)
+      }
+    }
+    if (lower.startsWith('lab(')) {
+      const parsed = parseLab(trimmed)
+      if (parsed) {
+        return labToRgb(parsed.L, parsed.a, parsed.b, parsed.alpha)
+      }
+    }
+    return trimmed
+  }
+
+  const buildColorVariableOverrides = () => {
+    if (typeof window === 'undefined') {
+      return ''
+    }
+    const rootStyles = window.getComputedStyle(document.documentElement)
+    const overrides = TAILWIND_COLOR_VARIABLES.map(variable => {
+      const raw = rootStyles.getPropertyValue(variable).trim()
+      if (!raw) {
+        return null
+      }
+      const normalized = normalizeColorValue(raw)
+      return `${variable}: ${normalized};`
+    }).filter(Boolean)
+
+    return overrides.join(' ')
+  }
+
+  const waitForInvoiceAssets = async (element: HTMLDivElement) => {
+    if (document.fonts?.ready) {
+      await document.fonts.ready
+    }
+
+    const images = Array.from(element.querySelectorAll('img'))
+    await Promise.all(
+      images.map(img => {
+        if (img.complete && img.naturalWidth > 0) {
+          return Promise.resolve()
+        }
+
+        return new Promise<void>(resolve => {
+          const handleDone = () => {
+            img.removeEventListener('load', handleDone)
+            img.removeEventListener('error', handleDone)
+            resolve()
+          }
+          img.addEventListener('load', handleDone)
+          img.addEventListener('error', handleDone)
+        })
+      })
+    )
+  }
 
   useEffect(() => {
     async function fetchInvoice() {
@@ -57,71 +376,133 @@ export default function InvoiceViewPage({ params }: PageProps) {
 
     setDownloadingPDF(true)
     try {
-      console.log('Starting PDF generation...')
+      const shouldNormalizeColor = (value: string) => {
+        const normalized = value.toLowerCase()
+        return (
+          normalized.includes('lab(') ||
+          normalized.includes('oklab(') ||
+          normalized.includes('oklch(') ||
+          normalized.includes('color-mix')
+        )
+      }
 
-      // Temporarily add print media styles
-      const printStyle = document.createElement('style')
-      printStyle.id = 'pdf-print-styles'
-      printStyle.textContent = `
-        @media screen {
-          [data-invoice-content] * {
-            background-color: white !important;
-            color: black !important;
-          }
-          [data-invoice-content] .border-blue-600 {
-            border-color: #2563eb !important;
-          }
-          [data-invoice-content] .bg-blue-600 {
-            background-color: #2563eb !important;
-            color: white !important;
-          }
-          [data-invoice-content] .bg-gray-50 {
-            background-color: #f9fafb !important;
-          }
-          [data-invoice-content] .bg-gray-100 {
-            background-color: #f3f4f6 !important;
-          }
-          [data-invoice-content] .text-blue-600 {
-            color: #2563eb !important;
-          }
-          [data-invoice-content] .text-gray-600 {
-            color: #4b5563 !important;
-          }
-          [data-invoice-content] .text-gray-900 {
-            color: #111827 !important;
-          }
-        }
-      `
-      document.head.appendChild(printStyle)
-
-      // Capture the invoice element as canvas
+      const colorVariableOverrides = buildColorVariableOverrides()
+      await waitForInvoiceAssets(invoiceRef.current)
       const canvas = await html2canvas(invoiceRef.current, {
         scale: 2,
         useCORS: true,
-        allowTaint: true,
+        allowTaint: false,
         logging: false,
-        backgroundColor: '#ffffff',
+        backgroundColor: PDF_BACKGROUND_COLOR,
+        onclone: (doc) => {
+          const clone = doc.querySelector('[data-invoice-content]')
+          if (!clone) {
+            return
+          }
+          doc.documentElement.style.width = `${PDF_PAGE_WIDTH_PX}px`
+          doc.documentElement.style.margin = '0'
+          doc.documentElement.style.padding = '0'
+          doc.body.style.width = `${PDF_PAGE_WIDTH_PX}px`
+          doc.body.style.margin = '0'
+          doc.body.style.padding = '0'
+          clone.setAttribute('style', `${clone.getAttribute('style') || ''}; width: ${PDF_PAGE_WIDTH_PX}px; max-width: none; margin: 0; box-sizing: border-box;`)
+          const styleLines: string[] = []
+          if (colorVariableOverrides) {
+            styleLines.push(`[data-invoice-content]{${colorVariableOverrides}}`)
+          }
+          styleLines.push(
+            `[data-invoice-content], [data-invoice-content] * { background-color: ${PDF_BACKGROUND_COLOR} !important; background-image: none !important; box-shadow: none !important; text-shadow: none !important; color: ${PDF_TEXT_COLOR} !important; }`
+          )
+          if (styleLines.length > 0) {
+            const style = doc.createElement('style')
+            style.textContent = styleLines.join('\n')
+            doc.head.appendChild(style)
+          }
+          const sourceRoot = invoiceRef.current
+          if (sourceRoot) {
+            const sourceWalker = document.createTreeWalker(
+              sourceRoot,
+              NodeFilter.SHOW_ELEMENT
+            )
+            const cloneWalker = doc.createTreeWalker(
+              clone,
+              NodeFilter.SHOW_ELEMENT
+            )
+            const colorProps = [
+              'border-top-color',
+              'border-right-color',
+              'border-bottom-color',
+              'border-left-color',
+              'outline-color',
+              'text-decoration-color',
+              'caret-color',
+              'fill',
+              'stroke',
+            ]
+
+            let sourceNode = sourceWalker.currentNode as Element | null
+            let cloneNode = cloneWalker.currentNode as Element | null
+
+            while (sourceNode && cloneNode) {
+              const sourceStyle = window.getComputedStyle(sourceNode)
+              const cloneElement = cloneNode as HTMLElement
+
+              if (cloneElement.tagName !== 'IMG') {
+                cloneElement.style.setProperty('background-color', PDF_BACKGROUND_COLOR, 'important')
+                cloneElement.style.setProperty('background-image', 'none', 'important')
+                cloneElement.style.setProperty('color', PDF_TEXT_COLOR, 'important')
+              }
+
+              colorProps.forEach((property) => {
+                const value = sourceStyle.getPropertyValue(property).trim()
+                if (!value) {
+                  return
+                }
+                const normalized = shouldNormalizeColor(value)
+                  ? normalizeColorValue(value)
+                  : value
+                cloneElement.style.setProperty(property, normalized, 'important')
+              })
+
+              const boxShadow = sourceStyle.getPropertyValue('box-shadow').trim()
+              if (boxShadow && shouldNormalizeColor(boxShadow)) {
+                cloneElement.style.setProperty('box-shadow', 'none', 'important')
+              }
+
+              const textShadow = sourceStyle.getPropertyValue('text-shadow').trim()
+              if (textShadow && shouldNormalizeColor(textShadow)) {
+                cloneElement.style.setProperty('text-shadow', 'none', 'important')
+              }
+
+              const backgroundImage = sourceStyle.getPropertyValue('background-image').trim()
+              if (backgroundImage && shouldNormalizeColor(backgroundImage)) {
+                cloneElement.style.setProperty('background-image', 'none', 'important')
+              }
+
+              sourceNode = sourceWalker.nextNode() as Element | null
+              cloneNode = cloneWalker.nextNode() as Element | null
+            }
+          }
+          const images = Array.from(clone.querySelectorAll('img'))
+          images.forEach(img => {
+            img.setAttribute('crossorigin', 'anonymous')
+          })
+        },
       })
-
-      // Remove the temporary style
-      document.getElementById('pdf-print-styles')?.remove()
-
-      console.log('Canvas created:', canvas.width, 'x', canvas.height)
-
-      // Calculate PDF dimensions
-      const imgWidth = 210 // A4 width in mm
-      const pageHeight = 297 // A4 height in mm
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
-      let heightLeft = imgHeight
 
       // Create PDF
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: 'a4',
+        format: 'letter',
       })
 
       const imgData = canvas.toDataURL('image/png', 1.0)
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const imgWidth = pageWidth
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      let heightLeft = imgHeight
       let position = 0
 
       // Add first page
@@ -142,9 +523,7 @@ export default function InvoiceViewPage({ params }: PageProps) {
       const safeCustomerName = customerName.replace(/[^a-zA-Z0-9]/g, '_')
       const filename = `Invoice_${invoiceNumber}_${safeCustomerName}.pdf`
 
-      console.log('Saving PDF as:', filename)
       pdf.save(filename)
-      console.log('PDF saved successfully')
     } catch (error) {
       console.error('Error generating PDF:', error)
       alert(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)

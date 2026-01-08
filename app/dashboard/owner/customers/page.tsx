@@ -634,6 +634,7 @@ export default function CustomersPage() {
             onServiceAddressSelect={handleServiceAddressSelect}
             onSameAsBillingToggle={handleSameAsBillingToggle}
             onInputChange={handleInputChange}
+            onRefreshData={() => fetchCustomersData(statusFilter)}
           />
         )}
       </div>

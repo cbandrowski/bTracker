@@ -1,5 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import {
+  createAssignmentForOwner,
+  listAssignmentsForOwner,
+  ServiceError,
+} from '@/lib/services/assignments'
+
+const CreateAssignmentSchema = z.object({
+  company_id: z.string().uuid().optional(),
+  job_id: z.string().uuid(),
+  employee_id: z.string().uuid(),
+  service_start_at: z.string().datetime().optional().nullable(),
+  service_end_at: z.string().datetime().optional().nullable(),
+  notes: z.string().optional().nullable(),
+})
 
 // GET /api/assignments - List all assignments for user's companies
 export async function GET(request: NextRequest) {
@@ -12,34 +27,17 @@ export async function GET(request: NextRequest) {
     }
 
     const companyIds = await getUserCompanyIds(supabase, user.id)
-
     if (companyIds.length === 0) {
       return NextResponse.json([])
     }
 
-    const { data, error } = await supabase
-      .from('job_assignments')
-      .select(`
-        *,
-        job:jobs(
-          *,
-          customer:customers(*)
-        ),
-        employee:company_employees(
-          *,
-          profile:profiles(*)
-        )
-      `)
-      .in('company_id', companyIds)
-      .neq('assignment_status', 'cancelled')
+    const assignments = await listAssignmentsForOwner(supabase, user.id)
 
-    if (error) {
-      console.error('Error fetching assignments:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
+    return NextResponse.json(assignments)
   } catch (error) {
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
     console.error('Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -58,7 +56,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    const body = CreateAssignmentSchema.parse(await request.json())
 
     const companyIds = await getUserCompanyIds(supabase, user.id)
     if (companyIds.length === 0) {
@@ -68,41 +66,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Use first company or company_id from body if provided
-    const companyId = body.company_id || companyIds[0]
+    const companyId = body.company_id ?? companyIds[0]
 
-    // Verify user owns this company
-    if (!companyIds.includes(companyId)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
-    }
+    const assignment = await createAssignmentForOwner(supabase, user.id, {
+      ...body,
+      company_id: companyId,
+    })
 
-    const { data, error } = await supabase
-      .from('job_assignments')
-      .insert([{
-        company_id: companyId,
-        assignment_status: 'assigned',
-        ...body
-      }])
-      .select(`
-        *,
-        job:jobs(
-          *,
-          customer:customers(*)
-        ),
-        employee:company_employees(
-          *,
-          profile:profiles(*)
-        )
-      `)
-      .single()
-
-    if (error) {
-      console.error('Error creating assignment:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data, { status: 201 })
+    return NextResponse.json(assignment, { status: 201 })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.issues },
+        { status: 422 }
+      )
+    }
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
     console.error('Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

@@ -35,6 +35,7 @@ import {
 import { useRouter } from 'next/navigation'
 import React, { useState, useMemo } from 'react'
 import AddressAutocomplete, { ParsedAddress } from '@/components/AddressAutocomplete'
+import { ServiceAddressList } from '@/components/customers/ServiceAddressList'
 
 interface CustomersTableProps {
   customers: CustomerWithBilling[]
@@ -53,6 +54,7 @@ interface CustomersTableProps {
   onSameAsBillingToggle?: (checked: boolean) => void
   onInputChange?: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void
   onArchiveToggle?: (customer: CustomerWithBilling, archived: boolean) => void
+  onRefreshData?: () => void // Callback to refresh customer data
 }
 
 export function CustomersTable({
@@ -72,6 +74,7 @@ export function CustomersTable({
   onSameAsBillingToggle,
   onInputChange,
   onArchiveToggle,
+  onRefreshData,
 }: CustomersTableProps) {
   const router = useRouter()
   const [sortColumn, setSortColumn] = useState<keyof CustomerWithBilling | null>(null)
@@ -82,7 +85,7 @@ export function CustomersTable({
     const currentPath = `${window.location.pathname}${window.location.search}`
     sessionStorage.setItem('createJobReturnPath', currentPath)
     sessionStorage.setItem('createJobForCustomer', JSON.stringify(customer))
-    router.push('/dashboard/owner/jobs?create=true')
+    router.push('/dashboard/owner/assignments?create=true')
   }
 
   const handleManualInvoice = (customer: CustomerWithBilling) => {
@@ -599,6 +602,14 @@ export function CustomersTable({
                     )}
                   </div>
 
+                  {/* Additional Service Addresses */}
+                  <div>
+                    <ServiceAddressList
+                      customerId={customer.id}
+                      onAddressChange={onRefreshData}
+                    />
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-1">
                       Notes
@@ -1073,6 +1084,14 @@ export function CustomersTable({
                             </div>
                           </div>
                         )}
+                      </div>
+
+                      {/* Additional Service Addresses */}
+                      <div className="mt-4">
+                        <ServiceAddressList
+                          customerId={customer.id}
+                          onAddressChange={onRefreshData}
+                        />
                       </div>
 
                       <div className="mt-4">
