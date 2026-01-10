@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
-import { Customer, JobWithCustomer } from '@/types/database'
+import { Customer, Job, JobWithCustomer } from '@/types/database'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import { jobsService, companiesService } from '@/lib/services'
@@ -33,7 +33,9 @@ export default function JobsPage() {
     service_zipcode: '',
     service_country: 'USA',
     tasks_to_complete: '',
-    planned_end_date: ''
+    planned_end_date: '',
+    arrival_window_start_time: '',
+    arrival_window_end_time: ''
   })
   const [formData, setFormData] = useState(createEmptyForm)
 
@@ -124,7 +126,9 @@ export default function JobsPage() {
             ? (customer.billing_country || 'USA')
             : (customer.service_country || customer.billing_country || 'USA'),
           tasks_to_complete: '',
-          planned_end_date: ''
+          planned_end_date: '',
+          arrival_window_start_time: '',
+          arrival_window_end_time: ''
         })
 
         setShowForm(true)
@@ -175,10 +179,35 @@ export default function JobsPage() {
       return
     }
 
+    const arrivalStart = formData.arrival_window_start_time || ''
+    const arrivalEnd = formData.arrival_window_end_time || ''
+
+    if ((arrivalStart && !arrivalEnd) || (!arrivalStart && arrivalEnd)) {
+      alert('Please set both arrival window times')
+      return
+    }
+
+    if (arrivalStart && arrivalEnd) {
+      const [startHour, startMinute] = arrivalStart.split(':').map(Number)
+      const [endHour, endMinute] = arrivalEnd.split(':').map(Number)
+      const startTotal = startHour * 60 + startMinute
+      const endTotal = endHour * 60 + endMinute
+
+      if (endTotal <= startTotal) {
+        alert('Arrival window end time must be after start time')
+        return
+      }
+
+      if (!formData.planned_end_date) {
+        alert('Please set a planned completion date when using an arrival window')
+        return
+      }
+    }
+
     setSubmitting(true)
 
     try {
-      const jobData = {
+      const jobData: Omit<Job, 'id' | 'created_at' | 'updated_at'> = {
         company_id: companyId,
         customer_id: formData.customer_id,
         title: formData.title,
@@ -191,10 +220,12 @@ export default function JobsPage() {
         service_country: formData.service_country || 'USA',
         tasks_to_complete: formData.tasks_to_complete || null,
         planned_end_date: formData.planned_end_date || null,
+        arrival_window_start_time: arrivalStart || null,
+        arrival_window_end_time: arrivalEnd || null,
         status: 'upcoming'
       }
 
-      const response = await jobsService.create(jobData as any)
+      const response = await jobsService.create(jobData)
 
       if (response.error) throw new Error(response.error)
 
@@ -393,6 +424,32 @@ export default function JobsPage() {
                 onChange={handleInputChange}
                 className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
+            </div>
+
+            {/* Arrival Window */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Arrival Window
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="time"
+                  name="arrival_window_start_time"
+                  value={formData.arrival_window_start_time}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+                <input
+                  type="time"
+                  name="arrival_window_end_time"
+                  value={formData.arrival_window_end_time}
+                  onChange={handleInputChange}
+                  className="w-full px-4 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Optional. Shows the preferred arrival range for the planned date.
+              </p>
             </div>
 
             {/* Action Buttons */}

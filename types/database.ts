@@ -165,6 +165,8 @@ export interface Job {
 
   // Planned date
   planned_end_date: string | null  // date
+  arrival_window_start_time: string | null  // time
+  arrival_window_end_time: string | null  // time
 
   created_at: string
   updated_at: string
@@ -299,6 +301,17 @@ export interface EmployeeAvailability {
   company_employee_id: string
   day_of_week: number
   is_available: boolean
+  start_time: string | null
+  end_time: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CompanyBusinessHours {
+  id: string
+  company_id: string
+  day_of_week: number
+  is_open: boolean
   start_time: string | null
   end_time: string | null
   created_at: string

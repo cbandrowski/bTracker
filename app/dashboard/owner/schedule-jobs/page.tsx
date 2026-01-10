@@ -357,6 +357,68 @@ export default function SchedulePage() {
     return `${start} - ${end}`
   }
 
+  const formatTimeValue = (timeValue: string) => {
+    const [hoursStr, minutesStr] = timeValue.split(':')
+    const hours = Number(hoursStr)
+    const minutes = Number(minutesStr)
+    const date = new Date()
+    date.setHours(hours, minutes, 0, 0)
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+  }
+
+  const combineDateAndTime = (dateString: string, timeValue: string) => {
+    const [yearStr, monthStr, dayStr] = dateString.split('-')
+    const year = Number(yearStr)
+    const month = Number(monthStr)
+    const day = Number(dayStr)
+    const [hoursStr, minutesStr, secondsStr] = timeValue.split(':')
+    const hours = Number(hoursStr)
+    const minutes = Number(minutesStr)
+    const seconds = Number(secondsStr ?? 0)
+    return new Date(year, month - 1, day, hours, minutes, seconds, 0).toISOString()
+  }
+
+  const formatDateValue = (dateString: string) => {
+    const [yearStr, monthStr, dayStr] = dateString.split('-')
+    const year = Number(yearStr)
+    const month = Number(monthStr)
+    const day = Number(dayStr)
+    return new Date(year, month - 1, day).toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  }
+
+  const getAssignmentWindow = (assignment: AssignmentWithDetails) => {
+    if (assignment.service_start_at) {
+      return {
+        startAt: assignment.service_start_at,
+        endAt: assignment.service_end_at,
+      }
+    }
+
+    if (
+      assignment.job?.planned_end_date &&
+      assignment.job.arrival_window_start_time &&
+      assignment.job.arrival_window_end_time
+    ) {
+      return {
+        startAt: combineDateAndTime(
+          assignment.job.planned_end_date,
+          assignment.job.arrival_window_start_time
+        ),
+        endAt: combineDateAndTime(
+          assignment.job.planned_end_date,
+          assignment.job.arrival_window_end_time
+        ),
+      }
+    }
+
+    return { startAt: null, endAt: null }
+  }
+
   const getStatusColor = (status: AssignmentStatus) => {
     switch (status) {
       case 'assigned':
@@ -410,6 +472,9 @@ export default function SchedulePage() {
   const minuteHeight = HOUR_BLOCK_HEIGHT / 60
   const timelineHeight = HOURS_IN_DAY * HOUR_BLOCK_HEIGHT
   const dayAssignments = getAssignmentsForDay(currentDate)
+  const selectedWindow = selectedAssignment
+    ? getAssignmentWindow(selectedAssignment)
+    : { startAt: null, endAt: null }
 
   const handleDaySelection = (day: Date) => {
     const selectedDay = new Date(day)
@@ -664,15 +729,15 @@ export default function SchedulePage() {
                     </div>
                   )}
                   {dayAssignments.map(assignment => {
-                    // If no service_start_at but has planned_end_date, show as all-day at top
-                    const hasServiceTime = !!assignment.service_start_at
+                    const { startAt, endAt } = getAssignmentWindow(assignment)
+                    const hasServiceTime = !!startAt
 
                     let top = 0
                     let height = 0
 
                     if (hasServiceTime) {
-                      const startMinutes = Math.max(0, Math.min(minutesSinceStartOfDay(assignment.service_start_at!), HOURS_IN_DAY * 60))
-                      const endMinutesRaw = assignment.service_end_at ? minutesSinceStartOfDay(assignment.service_end_at) : startMinutes + 60
+                      const startMinutes = Math.max(0, Math.min(minutesSinceStartOfDay(startAt!), HOURS_IN_DAY * 60))
+                      const endMinutesRaw = endAt ? minutesSinceStartOfDay(endAt) : startMinutes + 60
                       const endMinutes = Math.max(startMinutes + MIN_MINUTES_PER_BLOCK, Math.min(endMinutesRaw, HOURS_IN_DAY * 60))
                       const durationMinutes = Math.max(MIN_MINUTES_PER_BLOCK, endMinutes - startMinutes)
                       top = startMinutes * minuteHeight
@@ -703,7 +768,7 @@ export default function SchedulePage() {
                           {assignment.job?.customer?.name || 'No customer'}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {formatTimeRange(assignment.service_start_at, assignment.service_end_at, assignment.job?.planned_end_date)}
+                          {formatTimeRange(startAt, endAt, assignment.job?.planned_end_date)}
                         </div>
                         <div className="mt-2">
                           <span className="text-xs px-2 py-0.5 rounded glass-surface border border-border">
@@ -774,7 +839,10 @@ export default function SchedulePage() {
                             }}
                           >
                             <div className="font-semibold truncate">
-                              {assignment.service_start_at ? formatTime(assignment.service_start_at) : 'All day'}
+                              {(() => {
+                                const { startAt } = getAssignmentWindow(assignment)
+                                return startAt ? formatTime(startAt) : 'All day'
+                              })()}
                             </div>
                             <div className="truncate">{assignment.job?.title || 'Untitled Job'}</div>
                             {viewMode === 'week' && (
@@ -860,24 +928,36 @@ export default function SchedulePage() {
               <div className="bg-gray-900 rounded-lg p-4">
                 <div className="text-sm font-semibold text-gray-400 mb-2">📅 Service Date</div>
                 <div className="text-white">
-                  {selectedAssignment.service_start_at ?
-                    new Date(selectedAssignment.service_start_at).toLocaleDateString('en-US', {
+                  {selectedWindow.startAt
+                    ? new Date(selectedWindow.startAt).toLocaleDateString('en-US', {
                       weekday: 'long',
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
-                    }) : 'Not scheduled'}
+                    })
+                    : (selectedAssignment.job?.planned_end_date
+                      ? formatDateValue(selectedAssignment.job.planned_end_date)
+                      : 'Not scheduled')}
                 </div>
               </div>
               <div className="bg-gray-900 rounded-lg p-4">
                 <div className="text-sm font-semibold text-gray-400 mb-2">🕐 Time</div>
                 <div className="text-white">
-                  {selectedAssignment.service_start_at && formatTime(selectedAssignment.service_start_at)}
-                  {selectedAssignment.service_end_at && ` - ${formatTime(selectedAssignment.service_end_at)}`}
-                  {!selectedAssignment.service_start_at && 'Not scheduled'}
+                  {selectedWindow.startAt && formatTime(selectedWindow.startAt)}
+                  {selectedWindow.endAt && ` - ${formatTime(selectedWindow.endAt)}`}
+                  {!selectedWindow.startAt && 'Not scheduled'}
                 </div>
               </div>
             </div>
+
+            {selectedAssignment.job?.arrival_window_start_time && selectedAssignment.job?.arrival_window_end_time && (
+              <div className="bg-gray-900 rounded-lg p-4">
+                <div className="text-sm font-semibold text-gray-400 mb-2">🪟 Arrival Window</div>
+                <div className="text-white">
+                  {formatTimeValue(selectedAssignment.job.arrival_window_start_time)} - {formatTimeValue(selectedAssignment.job.arrival_window_end_time)}
+                </div>
+              </div>
+            )}
 
             {/* Employee and Customer */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

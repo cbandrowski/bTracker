@@ -2,9 +2,9 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { Company } from '@/types/database'
+import { Company, CompanyBusinessHours, EmployeeAvailability } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -88,6 +88,15 @@ export default function OwnerDashboardPage() {
   const [paymentEditMode, setPaymentEditMode] = useState(false)
   const [savingPayment, setSavingPayment] = useState(false)
   const [applyingLateFees, setApplyingLateFees] = useState(false)
+
+  const [ownerAvailability, setOwnerAvailability] = useState<AvailabilityRow[]>(DEFAULT_AVAILABILITY)
+  const [businessHours, setBusinessHours] = useState<BusinessHoursRow[]>(DEFAULT_BUSINESS_HOURS)
+  const [ownerAvailabilityLoading, setOwnerAvailabilityLoading] = useState(true)
+  const [businessHoursLoading, setBusinessHoursLoading] = useState(true)
+  const [savingOwnerAvailability, setSavingOwnerAvailability] = useState(false)
+  const [savingBusinessHours, setSavingBusinessHours] = useState(false)
+  const [ownerHoursEditMode, setOwnerHoursEditMode] = useState(false)
+  const [businessHoursEditMode, setBusinessHoursEditMode] = useState(false)
 
   useEffect(() => {
     console.log('Owner Dashboard: Auth state check', {
@@ -207,12 +216,139 @@ export default function OwnerDashboardPage() {
     }
   }, [profile, router])
 
+  useEffect(() => {
+    const fetchOwnerAvailability = async () => {
+      setOwnerAvailabilityLoading(true)
+
+      try {
+        const response = await fetch('/api/employee-availability/me')
+        const payload = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Unable to load work hours')
+        }
+
+        setOwnerAvailability(mapAvailabilityFromServer(payload?.availability))
+      } catch (err) {
+        console.error('Failed to load owner work hours', err)
+        setError(err instanceof Error ? err.message : 'Failed to load work hours')
+      } finally {
+        setOwnerAvailabilityLoading(false)
+      }
+    }
+
+    const fetchBusinessHours = async () => {
+      setBusinessHoursLoading(true)
+
+      try {
+        const response = await fetch('/api/company/business-hours')
+        const payload = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(payload?.error || 'Unable to load business hours')
+        }
+
+        setBusinessHours(mapBusinessHoursFromServer(payload?.hours))
+      } catch (err) {
+        console.error('Failed to load business hours', err)
+        setError(err instanceof Error ? err.message : 'Failed to load business hours')
+      } finally {
+        setBusinessHoursLoading(false)
+      }
+    }
+
+    if (user) {
+      fetchOwnerAvailability()
+      fetchBusinessHours()
+    }
+  }, [user])
+
+  const ownerAvailabilityErrors = useMemo(() => {
+    const errors: Record<number, string | null> = {}
+    ownerAvailability.forEach((row) => {
+      errors[row.day_of_week] = validateAvailabilityRow(row)
+    })
+    return errors
+  }, [ownerAvailability])
+
+  const businessHoursErrors = useMemo(() => {
+    const errors: Record<number, string | null> = {}
+    businessHours.forEach((row) => {
+      errors[row.day_of_week] = validateBusinessHoursRow(row)
+    })
+    return errors
+  }, [businessHours])
+
+  const hasOwnerAvailabilityErrors = useMemo(
+    () => Object.values(ownerAvailabilityErrors).some((value) => Boolean(value)),
+    [ownerAvailabilityErrors]
+  )
+
+  const hasBusinessHoursErrors = useMemo(
+    () => Object.values(businessHoursErrors).some((value) => Boolean(value)),
+    [businessHoursErrors]
+  )
+
   const handleCompanyChange = (field: keyof typeof companyData, value: string | boolean) => {
     setCompanyData((prev) => ({ ...prev, [field]: value }))
   }
 
   const handleAccountantChange = (field: keyof Accountant, value: string) => {
     setAccountant((prev) => ({ ...prev, [field]: value }))
+  }
+
+  const handleToggleOwnerAvailability = (dayOfWeek: number, isAvailable: boolean) => {
+    setOwnerAvailability((prev) =>
+      prev.map((row) =>
+        row.day_of_week === dayOfWeek
+          ? {
+              ...row,
+              is_available: isAvailable,
+              start_time: isAvailable ? row.start_time : '',
+              end_time: isAvailable ? row.end_time : '',
+            }
+          : row
+      )
+    )
+  }
+
+  const handleOwnerAvailabilityTimeChange = (
+    dayOfWeek: number,
+    field: 'start_time' | 'end_time',
+    value: string
+  ) => {
+    setOwnerAvailability((prev) =>
+      prev.map((row) =>
+        row.day_of_week === dayOfWeek ? { ...row, [field]: value } : row
+      )
+    )
+  }
+
+  const handleToggleBusinessHours = (dayOfWeek: number, isOpen: boolean) => {
+    setBusinessHours((prev) =>
+      prev.map((row) =>
+        row.day_of_week === dayOfWeek
+          ? {
+              ...row,
+              is_open: isOpen,
+              start_time: isOpen ? row.start_time : '',
+              end_time: isOpen ? row.end_time : '',
+            }
+          : row
+      )
+    )
+  }
+
+  const handleBusinessHoursTimeChange = (
+    dayOfWeek: number,
+    field: 'start_time' | 'end_time',
+    value: string
+  ) => {
+    setBusinessHours((prev) =>
+      prev.map((row) =>
+        row.day_of_week === dayOfWeek ? { ...row, [field]: value } : row
+      )
+    )
   }
 
   const handleSave = async () => {
@@ -270,6 +406,91 @@ export default function OwnerDashboardPage() {
       setSaving(false)
     }
   }
+
+  const handleSaveOwnerAvailability = async () => {
+    if (hasOwnerAvailabilityErrors) {
+      setError('Fix work hour errors before saving.')
+      return
+    }
+
+    setSavingOwnerAvailability(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch('/api/employee-availability/me', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          ownerAvailability.map((row) => ({
+            day_of_week: row.day_of_week,
+            is_available: row.is_available,
+            start_time: row.is_available ? row.start_time || null : null,
+            end_time: row.is_available ? row.end_time || null : null,
+          }))
+        ),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to save work hours')
+      }
+
+      setOwnerAvailability(mapAvailabilityFromServer(payload?.availability))
+      setSuccess('Owner work hours saved successfully!')
+      setOwnerHoursEditMode(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save work hours')
+    } finally {
+      setSavingOwnerAvailability(false)
+    }
+  }
+
+  const handleSaveBusinessHours = async () => {
+    if (hasBusinessHoursErrors) {
+      setError('Fix business hour errors before saving.')
+      return
+    }
+
+    setSavingBusinessHours(true)
+    setError(null)
+    setSuccess(null)
+
+    try {
+      const response = await fetch('/api/company/business-hours', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(
+          businessHours.map((row) => ({
+            day_of_week: row.day_of_week,
+            is_open: row.is_open,
+            start_time: row.is_open ? row.start_time || null : null,
+            end_time: row.is_open ? row.end_time || null : null,
+          }))
+        ),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to save business hours')
+      }
+
+      setBusinessHours(mapBusinessHoursFromServer(payload?.hours))
+      setSuccess('Business hours saved successfully!')
+      setBusinessHoursEditMode(false)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save business hours')
+    } finally {
+      setSavingBusinessHours(false)
+    }
+  }
+
+  const ownerHoursSummary = ownerAvailability.filter(
+    (row) => row.is_available && row.start_time && row.end_time
+  )
+  const businessHoursSummary = businessHours.filter(
+    (row) => row.is_open && row.start_time && row.end_time
+  )
 
   const handleSaveAccountant = async () => {
     setSavingAccountant(true)
@@ -521,6 +742,254 @@ export default function OwnerDashboardPage() {
           <p className="text-sm text-green-800 dark:text-green-300">{success}</p>
         </div>
       )}
+
+      {/* Owner Work Hours */}
+      <div className="glass-surface shadow-lg rounded-lg p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold guild-heading">Owner Work Hours</h2>
+            <p className="text-sm text-gray-400">Set the hours you work as an employee.</p>
+          </div>
+          {ownerHoursEditMode ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setOwnerHoursEditMode(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={ownerAvailabilityLoading || savingOwnerAvailability || hasOwnerAvailabilityErrors}
+                onClick={handleSaveOwnerAvailability}
+              >
+                {savingOwnerAvailability ? 'Saving...' : 'Save Work Hours'}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setOwnerHoursEditMode(true)}
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+
+        {ownerAvailabilityLoading ? (
+          <p className="text-sm text-gray-400">Loading work hours...</p>
+        ) : ownerHoursEditMode ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    Day
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    Working?
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    Start Time
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    End Time
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {ownerAvailability.map((day) => (
+                  <tr key={day.day_of_week}>
+                    <td className="px-4 py-3 text-sm text-white">{day.label}</td>
+                    <td className="px-4 py-3 text-sm text-white">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={day.is_available}
+                          onChange={(event) =>
+                            handleToggleOwnerAvailability(day.day_of_week, event.target.checked)
+                          }
+                        />
+                        <span>{day.is_available ? 'Working' : 'Off'}</span>
+                      </label>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="time"
+                        className="w-full rounded-md bg-gray-900 border border-gray-700 text-white px-3 py-2 disabled:opacity-50"
+                        value={day.start_time}
+                        onChange={(event) =>
+                          handleOwnerAvailabilityTimeChange(day.day_of_week, 'start_time', event.target.value)
+                        }
+                        disabled={!day.is_available}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="space-y-1">
+                        <input
+                          type="time"
+                          className="w-full rounded-md bg-gray-900 border border-gray-700 text-white px-3 py-2 disabled:opacity-50"
+                          value={day.end_time}
+                          onChange={(event) =>
+                            handleOwnerAvailabilityTimeChange(day.day_of_week, 'end_time', event.target.value)
+                          }
+                          disabled={!day.is_available}
+                        />
+                        {ownerAvailabilityErrors[day.day_of_week] && (
+                          <p className="text-xs text-red-400">{ownerAvailabilityErrors[day.day_of_week]}</p>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : ownerHoursSummary.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No work hours set yet.</p>
+        ) : (
+          <div className="space-y-2 text-sm text-gray-200">
+            {ownerHoursSummary.map((day) => (
+              <div key={day.day_of_week} className="flex flex-wrap gap-2">
+                <span className="font-medium text-white">{day.label}:</span>
+                <span>
+                  {formatTimeValue(day.start_time)} - {formatTimeValue(day.end_time)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Company Business Hours */}
+      <div className="glass-surface shadow-lg rounded-lg p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold guild-heading">Company Business Hours</h2>
+            <p className="text-sm text-gray-400">Define when your business is open.</p>
+          </div>
+          {businessHoursEditMode ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setBusinessHoursEditMode(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={businessHoursLoading || savingBusinessHours || hasBusinessHoursErrors}
+                onClick={handleSaveBusinessHours}
+              >
+                {savingBusinessHours ? 'Saving...' : 'Save Business Hours'}
+              </Button>
+            </div>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => setBusinessHoursEditMode(true)}
+            >
+              Edit
+            </Button>
+          )}
+        </div>
+
+        {businessHoursLoading ? (
+          <p className="text-sm text-gray-400">Loading business hours...</p>
+        ) : businessHoursEditMode ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-700">
+              <thead>
+                <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    Day
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    Open?
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    Start Time
+                  </th>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+                    End Time
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-700">
+                {businessHours.map((day) => (
+                  <tr key={day.day_of_week}>
+                    <td className="px-4 py-3 text-sm text-white">{day.label}</td>
+                    <td className="px-4 py-3 text-sm text-white">
+                      <label className="inline-flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={day.is_open}
+                          onChange={(event) =>
+                            handleToggleBusinessHours(day.day_of_week, event.target.checked)
+                          }
+                        />
+                        <span>{day.is_open ? 'Open' : 'Closed'}</span>
+                      </label>
+                    </td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="time"
+                        className="w-full rounded-md bg-gray-900 border border-gray-700 text-white px-3 py-2 disabled:opacity-50"
+                        value={day.start_time}
+                        onChange={(event) =>
+                          handleBusinessHoursTimeChange(day.day_of_week, 'start_time', event.target.value)
+                        }
+                        disabled={!day.is_open}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="space-y-1">
+                        <input
+                          type="time"
+                          className="w-full rounded-md bg-gray-900 border border-gray-700 text-white px-3 py-2 disabled:opacity-50"
+                          value={day.end_time}
+                          onChange={(event) =>
+                            handleBusinessHoursTimeChange(day.day_of_week, 'end_time', event.target.value)
+                          }
+                          disabled={!day.is_open}
+                        />
+                        {businessHoursErrors[day.day_of_week] && (
+                          <p className="text-xs text-red-400">{businessHoursErrors[day.day_of_week]}</p>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : businessHoursSummary.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No business hours set yet.</p>
+        ) : (
+          <div className="space-y-2 text-sm text-gray-200">
+            {businessHoursSummary.map((day) => (
+              <div key={day.day_of_week} className="flex flex-wrap gap-2">
+                <span className="font-medium text-white">{day.label}:</span>
+                <span>
+                  {formatTimeValue(day.start_time)} - {formatTimeValue(day.end_time)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Company Logo */}
       {companies.length > 0 && (
@@ -1376,4 +1845,117 @@ export default function OwnerDashboardPage() {
       )}
     </div>
   )
+}
+
+const DAYS_OF_WEEK = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+] as const
+
+type AvailabilityRow = {
+  day_of_week: (typeof DAYS_OF_WEEK)[number]['value']
+  label: string
+  is_available: boolean
+  start_time: string
+  end_time: string
+}
+
+type BusinessHoursRow = {
+  day_of_week: (typeof DAYS_OF_WEEK)[number]['value']
+  label: string
+  is_open: boolean
+  start_time: string
+  end_time: string
+}
+
+const DEFAULT_AVAILABILITY: AvailabilityRow[] = DAYS_OF_WEEK.map((day) => ({
+  day_of_week: day.value,
+  label: day.label,
+  is_available: false,
+  start_time: '',
+  end_time: '',
+}))
+
+const DEFAULT_BUSINESS_HOURS: BusinessHoursRow[] = DAYS_OF_WEEK.map((day) => ({
+  day_of_week: day.value,
+  label: day.label,
+  is_open: false,
+  start_time: '',
+  end_time: '',
+}))
+
+function mapAvailabilityFromServer(records?: EmployeeAvailability[]): AvailabilityRow[] {
+  return DAYS_OF_WEEK.map((day) => {
+    const record = records?.find((entry) => entry.day_of_week === day.value)
+    return {
+      day_of_week: day.value,
+      label: day.label,
+      is_available: record?.is_available ?? false,
+      start_time: record?.start_time ? record.start_time.slice(0, 5) : '',
+      end_time: record?.end_time ? record.end_time.slice(0, 5) : '',
+    }
+  })
+}
+
+function mapBusinessHoursFromServer(records?: CompanyBusinessHours[]): BusinessHoursRow[] {
+  return DAYS_OF_WEEK.map((day) => {
+    const record = records?.find((entry) => entry.day_of_week === day.value)
+    return {
+      day_of_week: day.value,
+      label: day.label,
+      is_open: record?.is_open ?? false,
+      start_time: record?.start_time ? record.start_time.slice(0, 5) : '',
+      end_time: record?.end_time ? record.end_time.slice(0, 5) : '',
+    }
+  })
+}
+
+function validateAvailabilityRow(row: AvailabilityRow): string | null {
+  if (!row.is_available) {
+    return null
+  }
+
+  if (!row.start_time || !row.end_time) {
+    return 'Start and end times are required'
+  }
+
+  if (row.start_time >= row.end_time) {
+    return 'Start time must be earlier than end time'
+  }
+
+  return null
+}
+
+function validateBusinessHoursRow(row: BusinessHoursRow): string | null {
+  if (!row.is_open) {
+    return null
+  }
+
+  if (!row.start_time || !row.end_time) {
+    return 'Start and end times are required'
+  }
+
+  if (row.start_time >= row.end_time) {
+    return 'Start time must be earlier than end time'
+  }
+
+  return null
+}
+
+function formatTimeValue(value: string) {
+  if (!value) return '—'
+  const [hoursStr, minutesStr] = value.split(':')
+  const hours = Number(hoursStr)
+  const minutes = Number(minutesStr)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return '—'
+  }
+  const date = new Date()
+  date.setHours(hours, minutes, 0, 0)
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
