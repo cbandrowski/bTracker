@@ -6,7 +6,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { format, addWeeks, startOfWeek, endOfWeek, isSameDay, parseISO } from 'date-fns'
+import { format, addWeeks, addMonths, startOfWeek, endOfWeek, startOfMonth, endOfMonth, isSameDay, isSameMonth, parseISO, eachDayOfInterval } from 'date-fns'
 
 interface Schedule {
   id: string
@@ -29,14 +29,24 @@ export default function MySchedulePage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [weekOffset, setWeekOffset] = useState(0)
+  const [monthOffset, setMonthOffset] = useState(0)
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week')
 
-  const fetchSchedules = async (offset: number) => {
+  const fetchSchedules = async (mode: 'week' | 'month', offset: number) => {
     try {
       setLoading(true)
       setError(null)
 
-      const startDate = startOfWeek(addWeeks(new Date(), offset), { weekStartsOn: 0 })
-      const endDate = endOfWeek(addWeeks(new Date(), offset), { weekStartsOn: 0 })
+      let startDate: Date
+      let endDate: Date
+
+      if (mode === 'week') {
+        startDate = startOfWeek(addWeeks(new Date(), offset), { weekStartsOn: 0 })
+        endDate = endOfWeek(addWeeks(new Date(), offset), { weekStartsOn: 0 })
+      } else {
+        startDate = startOfMonth(addMonths(new Date(), offset))
+        endDate = endOfMonth(addMonths(new Date(), offset))
+      }
 
       const response = await fetch(
         `/api/employee/schedule?from_date=${startDate.toISOString()}&to_date=${endDate.toISOString()}`
@@ -56,11 +66,14 @@ export default function MySchedulePage() {
   }
 
   useEffect(() => {
-    fetchSchedules(weekOffset)
-  }, [weekOffset])
+    fetchSchedules(viewMode, viewMode === 'week' ? weekOffset : monthOffset)
+  }, [weekOffset, monthOffset, viewMode])
 
   const currentWeekStart = startOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 0 })
   const currentWeekEnd = endOfWeek(addWeeks(new Date(), weekOffset), { weekStartsOn: 0 })
+  const currentMonth = addMonths(new Date(), monthOffset)
+  const currentMonthStart = startOfMonth(currentMonth)
+  const currentMonthEnd = endOfMonth(currentMonth)
 
   // Group schedules by day
   const schedulesByDay: Record<string, Schedule[]> = {}
@@ -78,6 +91,11 @@ export default function MySchedulePage() {
     date.setDate(date.getDate() + i)
     return date
   })
+
+  // Generate all days for the month view (including padding days from prev/next month)
+  const monthCalendarStart = startOfWeek(currentMonthStart, { weekStartsOn: 0 })
+  const monthCalendarEnd = endOfWeek(currentMonthEnd, { weekStartsOn: 0 })
+  const monthDays = eachDayOfInterval({ start: monthCalendarStart, end: monthCalendarEnd })
 
   const isToday = (date: Date) => isSameDay(date, new Date())
 
@@ -97,32 +115,78 @@ export default function MySchedulePage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+        {/* View Toggle */}
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-white">My Scheduled Shifts</h2>
+          <div className="flex items-center space-x-2 bg-gray-700 rounded-lg p-1">
+            <button
+              onClick={() => setViewMode('week')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'week'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              Week
+            </button>
+            <button
+              onClick={() => setViewMode('month')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'month'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-300 hover:text-white'
+              }`}
+            >
+              Month
+            </button>
+          </div>
+        </div>
 
-          {/* Week Navigation */}
+        {/* Navigation */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="text-white font-medium text-xl">
+            {viewMode === 'week'
+              ? `${format(currentWeekStart, 'MMM d')} - ${format(currentWeekEnd, 'MMM d, yyyy')}`
+              : format(currentMonth, 'MMMM yyyy')
+            }
+          </div>
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => setWeekOffset(weekOffset - 1)}
+              onClick={() => {
+                if (viewMode === 'week') {
+                  setWeekOffset(weekOffset - 1)
+                } else {
+                  setMonthOffset(monthOffset - 1)
+                }
+              }}
               className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors"
             >
               ← Previous
             </button>
-            <div className="text-white font-medium">
-              {format(currentWeekStart, 'MMM d')} - {format(currentWeekEnd, 'MMM d, yyyy')}
-            </div>
             <button
-              onClick={() => setWeekOffset(weekOffset + 1)}
+              onClick={() => {
+                if (viewMode === 'week') {
+                  setWeekOffset(weekOffset + 1)
+                } else {
+                  setMonthOffset(monthOffset + 1)
+                }
+              }}
               className="px-3 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-md transition-colors"
             >
               Next →
             </button>
-            {weekOffset !== 0 && (
+            {((viewMode === 'week' && weekOffset !== 0) || (viewMode === 'month' && monthOffset !== 0)) && (
               <button
-                onClick={() => setWeekOffset(0)}
+                onClick={() => {
+                  if (viewMode === 'week') {
+                    setWeekOffset(0)
+                  } else {
+                    setMonthOffset(0)
+                  }
+                }}
                 className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
               >
-                This Week
+                {viewMode === 'week' ? 'This Week' : 'This Month'}
               </button>
             )}
           </div>
@@ -135,7 +199,8 @@ export default function MySchedulePage() {
         )}
 
         {/* Week View */}
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+        {viewMode === 'week' && (
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
           {weekDays.map((date) => {
             const dateKey = format(date, 'yyyy-MM-dd')
             const daySchedules = schedulesByDay[dateKey] || []
@@ -197,14 +262,82 @@ export default function MySchedulePage() {
               </div>
             )
           })}
-        </div>
+          </div>
+        )}
+
+        {/* Month View */}
+        {viewMode === 'month' && (
+          <div>
+            {/* Day headers */}
+            <div className="grid grid-cols-7 gap-2 mb-2">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                <div key={day} className="text-center text-xs font-semibold text-gray-400 uppercase py-2">
+                  {day}
+                </div>
+              ))}
+            </div>
+
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7 gap-2">
+              {monthDays.map((date) => {
+                const dateKey = format(date, 'yyyy-MM-dd')
+                const daySchedules = schedulesByDay[dateKey] || []
+                const today = isToday(date)
+                const isCurrentMonth = isSameMonth(date, currentMonth)
+
+                return (
+                  <div
+                    key={dateKey}
+                    className={`min-h-[120px] rounded-lg border ${
+                      today
+                        ? 'border-blue-500 border-2 bg-blue-900 bg-opacity-20'
+                        : isCurrentMonth
+                        ? 'border-gray-600 bg-gray-700'
+                        : 'border-gray-700 bg-gray-800 opacity-50'
+                    } overflow-hidden`}
+                  >
+                    {/* Date header */}
+                    <div className={`p-2 text-center ${today ? 'bg-blue-900 bg-opacity-50' : ''}`}>
+                      <div className={`text-sm font-semibold ${
+                        today ? 'text-blue-300' : isCurrentMonth ? 'text-white' : 'text-gray-500'
+                      }`}>
+                        {format(date, 'd')}
+                      </div>
+                    </div>
+
+                    {/* Shifts for this day */}
+                    <div className="p-1 space-y-1">
+                      {daySchedules.length > 0 ? (
+                        daySchedules.map((schedule) => (
+                          <div
+                            key={schedule.id}
+                            className="bg-blue-900 bg-opacity-50 border border-blue-700 rounded p-1 text-xs"
+                          >
+                            <div className="font-semibold text-blue-200 truncate">
+                              {format(parseISO(schedule.start_planned), 'h:mm a')}
+                            </div>
+                            {schedule.job && (
+                              <div className="text-white truncate text-xs">
+                                {schedule.job.title}
+                              </div>
+                            )}
+                          </div>
+                        ))
+                      ) : null}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Summary */}
         <div className="mt-6 bg-gray-700 rounded-lg p-4 border border-gray-600">
           <div className="flex items-center justify-between">
             <div className="text-gray-300">
               <span className="font-semibold text-white">{schedules.length}</span>{' '}
-              {schedules.length === 1 ? 'shift' : 'shifts'} scheduled this week
+              {schedules.length === 1 ? 'shift' : 'shifts'} scheduled this {viewMode}
             </div>
             {schedules.length > 0 && (
               <div className="text-sm text-gray-400">

@@ -131,8 +131,14 @@ interface AssignmentWithDetails extends JobAssignment {
   employee?: CompanyEmployee & { profile?: Profile | null }
 }
 
-type AssignmentCreateInput = Omit<JobAssignment, 'id' | 'created_at' | 'updated_at' | 'assignment_status'> & {
+type AssignmentCreateInput = {
+  company_id: string
+  job_id: string
+  employee_id: string
+  service_start_at?: string | null
+  service_end_at?: string | null
   assignment_status?: AssignmentStatus
+  notes?: string | null
 }
 
 export const assignmentsService = {

@@ -488,7 +488,7 @@ export async function updateAssignmentStatusForOwnerEmployee(
   assignmentId: string,
   nextStatus: AssignmentStatus
 ): Promise<AssignmentWithDetails> {
-  const { data: existing, error } = await supabase
+  const { data: existingData, error } = await supabase
     .from('job_assignments')
     .select('id, company_id, employee_id, assignment_status')
     .eq('id', assignmentId)
@@ -497,6 +497,11 @@ export async function updateAssignmentStatusForOwnerEmployee(
   if (error) {
     throw new ServiceError(`Failed to load assignment: ${error.message}`, 500)
   }
+
+  const existing = existingData as Pick<
+    JobAssignment,
+    'id' | 'company_id' | 'employee_id' | 'assignment_status'
+  > | null
 
   if (!existing) {
     throw new ServiceError('Assignment not found', 404)
