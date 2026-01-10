@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { JobAssignment, JobWithCustomer, AssignmentStatus } from '@/types/database'
-import { Scroll, Swords, Award, MapPin, Clock, Building2 } from 'lucide-react'
+import { Scroll, Swords, Award, MapPin, Clock, Building2, Phone } from 'lucide-react'
 
 interface JobAssignmentWithJob extends JobAssignment {
   job?: JobWithCustomer
@@ -151,16 +151,34 @@ export default function EmployeeDashboardPage() {
                     <p className="text-cyan-300/80 text-xs mb-2">
                       <strong>Client:</strong> {assignment.job?.customer?.name || 'Unknown'}
                     </p>
-                    {assignment.job?.service_address && (
-                      <p className="text-cyan-300/80 text-xs mb-2 flex items-start">
-                        <MapPin className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" />
-                        <span>
-                          {assignment.job.service_address}
-                          {assignment.job.service_city && (
-                            <>, {assignment.job.service_city}, {assignment.job.service_state}</>
-                          )}
-                        </span>
+                    {assignment.job?.customer?.phone && (
+                      <p className="text-cyan-300/80 text-xs mb-2 flex items-center">
+                        <Phone className="w-3 h-3 mr-1" />
+                        <a href={`tel:${assignment.job.customer.phone}`} className="hover:text-cyan-200 transition-colors">
+                          {assignment.job.customer.phone}
+                        </a>
                       </p>
+                    )}
+                    {assignment.job?.service_address && (
+                      <div className="text-cyan-300/80 text-xs mb-2">
+                        <div className="flex items-start mb-1">
+                          <MapPin className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" />
+                          <span>
+                            {assignment.job.service_address}
+                            {assignment.job.service_city && (
+                              <>, {assignment.job.service_city}, {assignment.job.service_state}</>
+                            )}
+                          </span>
+                        </div>
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${assignment.job.service_address}, ${assignment.job.service_city}, ${assignment.job.service_state} ${assignment.job.service_zipcode || ''}`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-cyan-400 hover:text-cyan-300 hover:underline inline-block ml-4"
+                        >
+                          Get Directions →
+                        </a>
+                      </div>
                     )}
                     {assignment.service_start_at && (
                       <p className="text-cyan-300/80 text-xs flex items-center mb-2">
@@ -222,16 +240,34 @@ export default function EmployeeDashboardPage() {
                     <p className="text-cyan-300/80 text-xs mb-2">
                       <strong>Client:</strong> {assignment.job?.customer?.name || 'Unknown'}
                     </p>
-                    {assignment.job?.service_address && (
-                      <p className="text-cyan-300/80 text-xs mb-2 flex items-start">
-                        <MapPin className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" />
-                        <span>
-                          {assignment.job.service_address}
-                          {assignment.job.service_city && (
-                            <>, {assignment.job.service_city}, {assignment.job.service_state}</>
-                          )}
-                        </span>
+                    {assignment.job?.customer?.phone && (
+                      <p className="text-cyan-300/80 text-xs mb-2 flex items-center">
+                        <Phone className="w-3 h-3 mr-1" />
+                        <a href={`tel:${assignment.job.customer.phone}`} className="hover:text-cyan-200 transition-colors">
+                          {assignment.job.customer.phone}
+                        </a>
                       </p>
+                    )}
+                    {assignment.job?.service_address && (
+                      <div className="text-cyan-300/80 text-xs mb-2">
+                        <div className="flex items-start mb-1">
+                          <MapPin className="w-3 h-3 mr-1 mt-0.5 flex-shrink-0" />
+                          <span>
+                            {assignment.job.service_address}
+                            {assignment.job.service_city && (
+                              <>, {assignment.job.service_city}, {assignment.job.service_state}</>
+                            )}
+                          </span>
+                        </div>
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${assignment.job.service_address}, ${assignment.job.service_city}, ${assignment.job.service_state} ${assignment.job.service_zipcode || ''}`)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-cyan-400 hover:text-cyan-300 hover:underline inline-block ml-4"
+                        >
+                          Get Directions →
+                        </a>
+                      </div>
                     )}
                     {assignment.service_start_at && (
                       <p className="text-cyan-300/80 text-xs flex items-center mb-2">
@@ -287,6 +323,14 @@ export default function EmployeeDashboardPage() {
                     <p className="text-cyan-300/80 text-xs mb-2">
                       <strong>Client:</strong> {assignment.job?.customer?.name || 'Unknown'}
                     </p>
+                    {assignment.job?.customer?.phone && (
+                      <p className="text-cyan-300/80 text-xs mb-2 flex items-center">
+                        <Phone className="w-3 h-3 mr-1" />
+                        <a href={`tel:${assignment.job.customer.phone}`} className="hover:text-cyan-200 transition-colors">
+                          {assignment.job.customer.phone}
+                        </a>
+                      </p>
+                    )}
                     {assignment.worker_confirmed_done_at && (
                       <p className="text-emerald-300 text-xs flex items-center">
                         <Award className="w-3 h-3 mr-1" />
