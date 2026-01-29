@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import { createServerClient, getActiveCompanyContext, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
 import { Customer, CustomerJob, CustomerInvoice, CustomerPayment, CustomerStats } from '@/types/customer-details'
 import { CustomerDetailsClient } from '@/components/customers/CustomerDetailsClient'
 
@@ -16,13 +16,24 @@ async function getCustomerDetails(customerId: string) {
   }
 
   const companyIds = await getUserCompanyIds(supabase, user.id)
+  if (companyIds.length === 0) {
+    return null
+  }
+
+  const context = await getActiveCompanyContext(supabase, user.id)
+  const scopedCompanyIds =
+    context?.active_role === 'owner' &&
+    context.active_company_id &&
+    companyIds.includes(context.active_company_id)
+      ? [context.active_company_id]
+      : [companyIds[0]]
 
   // Fetch customer
   const { data: customer, error: customerError } = await supabase
     .from('customers')
     .select('*')
     .eq('id', customerId)
-    .in('company_id', companyIds)
+    .in('company_id', scopedCompanyIds)
     .single()
 
   if (customerError || !customer) {
@@ -47,7 +58,7 @@ async function getCustomerDetails(customerId: string) {
       )
     `)
     .eq('customer_id', customerId)
-    .in('company_id', companyIds)
+    .in('company_id', scopedCompanyIds)
     .order('created_at', { ascending: false })
 
   // Transform jobs to include assigned employee
@@ -81,7 +92,7 @@ async function getCustomerDetails(customerId: string) {
       updated_at
     `)
     .eq('customer_id', customerId)
-    .in('company_id', companyIds)
+    .in('company_id', scopedCompanyIds)
     .order('created_at', { ascending: false })
 
   // Transform invoices to match expected interface
@@ -108,7 +119,7 @@ async function getCustomerDetails(customerId: string) {
     .from('payments')
     .select('*')
     .eq('customer_id', customerId)
-    .in('company_id', companyIds)
+    .in('company_id', scopedCompanyIds)
     .order('payment_date', { ascending: false })
 
   const transformedPayments: CustomerPayment[] = (payments || []).map(p => ({
@@ -120,7 +131,7 @@ async function getCustomerDetails(customerId: string) {
     .from('customer_service_addresses')
     .select('*')
     .eq('customer_id', customerId)
-    .in('company_id', companyIds)
+    .in('company_id', scopedCompanyIds)
     .order('created_at', { ascending: true })
 
   // Calculate stats

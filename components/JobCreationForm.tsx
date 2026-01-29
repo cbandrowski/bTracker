@@ -234,7 +234,7 @@ export default function JobCreationForm({ companyId, onSuccess, onCancel, prefil
     setSubmitting(true)
 
     try {
-      const jobData: Omit<Job, 'id' | 'created_at' | 'updated_at'> = {
+      const jobData: Omit<Job, 'id' | 'created_at' | 'updated_at' | 'billing_hold'> = {
         company_id: companyId,
         customer_id: formData.customer_id,
         title: formData.title,

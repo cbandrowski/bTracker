@@ -3118,3 +3118,520 @@ using ((bucket_id = 'company_logos'::text));
 
 
 
+
+
+-- ========================================
+-- MERGED MIGRATIONS
+-- ========================================
+
+
+
+-- BEGIN MIGRATION: 20250209_add_pay_stubs.sql
+
+-- Pay stubs per payroll run and employee
+create table if not exists public.pay_stubs (
+    id uuid primary key default gen_random_uuid(),
+    payroll_run_id uuid not null references public.payroll_runs(id) on delete cascade,
+    employee_id uuid not null references public.company_employees(id) on delete cascade,
+    period_start date not null,
+    period_end date not null,
+    regular_hours numeric not null default 0,
+    overtime_hours numeric not null default 0,
+    total_hours numeric not null default 0,
+    hourly_rate numeric not null default 0,
+    gross_pay numeric not null default 0,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint pay_stubs_unique_run_employee unique (payroll_run_id, employee_id)
+);
+
+create table if not exists public.pay_stub_entries (
+    id uuid primary key default gen_random_uuid(),
+    pay_stub_id uuid not null references public.pay_stubs(id) on delete cascade,
+    work_date date not null,
+    regular_hours numeric not null default 0,
+    overtime_hours numeric not null default 0,
+    gross_pay numeric not null default 0,
+    created_at timestamptz not null default now()
+);
+
+create index if not exists idx_pay_stub_entries_pay_stub_id on public.pay_stub_entries(pay_stub_id);
+
+
+-- END MIGRATION: 20250209_add_pay_stubs.sql
+
+
+-- BEGIN MIGRATION: 20250209_add_payroll_settings.sql
+
+-- Payroll settings per company (pay period and auto-generation)
+create table if not exists public.payroll_settings (
+    id uuid primary key default gen_random_uuid(),
+    company_id uuid not null references public.companies(id) on delete cascade,
+    period_start_day integer not null default 1, -- 0=Sun ... 6=Sat
+    period_end_day integer not null default 0,
+    auto_generate boolean not null default false,
+    last_generated_end_date date,
+    created_at timestamptz not null default now(),
+    updated_at timestamptz not null default now(),
+    constraint payroll_settings_day_range check (period_start_day between 0 and 6 and period_end_day between 0 and 6)
+);
+
+create unique index if not exists payroll_settings_company_idx on public.payroll_settings(company_id);
+
+create trigger update_payroll_settings_updated_at
+before update on public.payroll_settings
+for each row
+execute function public.update_updated_at_column();
+
+
+-- END MIGRATION: 20250209_add_payroll_settings.sql
+
+
+-- BEGIN MIGRATION: 20250209_add_time_entries_owner_insert_policy.sql
+
+-- Allow owners to insert manual time entries for their company
+create policy "owners_insert_time_entries"
+on public.time_entries
+for insert
+to authenticated
+with check (
+  exists (
+    select 1
+    from public.company_owners co
+    where co.company_id = time_entries.company_id
+      and co.profile_id = auth.uid()
+  )
+);
+
+
+-- END MIGRATION: 20250209_add_time_entries_owner_insert_policy.sql
+
+
+-- BEGIN MIGRATION: 20250210_add_time_entry_adjustments.sql
+
+-- Time Entry Adjustments Audit Trail
+-- Tracks all modifications to time entries for accountability
+
+CREATE TABLE IF NOT EXISTS public.time_entry_adjustments (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    time_entry_id uuid NOT NULL REFERENCES public.time_entries(id) ON DELETE CASCADE,
+    adjusted_by uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+
+    -- Original values before adjustment
+    original_clock_in timestamp with time zone,
+    original_clock_out timestamp with time zone,
+
+    -- New values after adjustment
+    new_clock_in timestamp with time zone,
+    new_clock_out timestamp with time zone,
+
+    -- Reason for adjustment
+    adjustment_reason text NOT NULL,
+
+    -- Timestamps
+    adjusted_at timestamptz NOT NULL DEFAULT now(),
+
+    CONSTRAINT valid_adjustment_times CHECK (
+        new_clock_in IS NULL OR
+        new_clock_out IS NULL OR
+        new_clock_out > new_clock_in
+    )
+);
+
+-- Indexes for performance
+CREATE INDEX idx_time_entry_adjustments_time_entry ON public.time_entry_adjustments(time_entry_id);
+CREATE INDEX idx_time_entry_adjustments_adjusted_by ON public.time_entry_adjustments(adjusted_by);
+CREATE INDEX idx_time_entry_adjustments_date ON public.time_entry_adjustments(adjusted_at);
+
+-- Comments
+COMMENT ON TABLE public.time_entry_adjustments IS 'Audit trail for all time entry modifications';
+COMMENT ON COLUMN public.time_entry_adjustments.original_clock_in IS 'Clock in time before adjustment';
+COMMENT ON COLUMN public.time_entry_adjustments.original_clock_out IS 'Clock out time before adjustment';
+COMMENT ON COLUMN public.time_entry_adjustments.new_clock_in IS 'Clock in time after adjustment';
+COMMENT ON COLUMN public.time_entry_adjustments.new_clock_out IS 'Clock out time after adjustment';
+
+-- RLS Policies
+ALTER TABLE public.time_entry_adjustments ENABLE ROW LEVEL SECURITY;
+
+-- Owners can view adjustments for their company's time entries
+CREATE POLICY "Owners can view their company time entry adjustments"
+ON public.time_entry_adjustments
+FOR SELECT
+USING (
+    time_entry_id IN (
+        SELECT te.id
+        FROM public.time_entries te
+        WHERE te.company_id IN (
+            SELECT company_id
+            FROM public.company_owners
+            WHERE profile_id = auth.uid()
+        )
+    )
+);
+
+-- Owners can insert adjustments for their company's time entries
+CREATE POLICY "Owners can insert time entry adjustments"
+ON public.time_entry_adjustments
+FOR INSERT
+WITH CHECK (
+    time_entry_id IN (
+        SELECT te.id
+        FROM public.time_entries te
+        WHERE te.company_id IN (
+            SELECT company_id
+            FROM public.company_owners
+            WHERE profile_id = auth.uid()
+        )
+    )
+);
+
+-- Grant permissions
+GRANT SELECT, INSERT ON TABLE public.time_entry_adjustments TO authenticated;
+GRANT ALL ON TABLE public.time_entry_adjustments TO service_role;
+
+
+-- END MIGRATION: 20250210_add_time_entry_adjustments.sql
+
+
+-- BEGIN MIGRATION: 20250214_add_company_business_hours.sql
+
+create table if not exists public.company_business_hours (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id) on delete cascade,
+  day_of_week smallint not null,
+  is_open boolean not null default false,
+  start_time time without time zone,
+  end_time time without time zone,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint company_business_hours_day_of_week_check check (day_of_week >= 0 and day_of_week <= 6),
+  constraint company_business_hours_time_valid check (
+    (is_open = false and start_time is null and end_time is null)
+    or (
+      is_open = true
+      and start_time is not null
+      and end_time is not null
+      and start_time < end_time
+    )
+  ),
+  constraint company_business_hours_unique_day unique (company_id, day_of_week)
+);
+
+create index if not exists company_business_hours_company_idx
+  on public.company_business_hours(company_id);
+
+alter table public.company_business_hours enable row level security;
+
+create policy "Owners can manage company business hours"
+  on public.company_business_hours
+  for all
+  using (
+    company_id in (
+      select company_id
+      from public.company_owners
+      where profile_id = auth.uid()
+    )
+  )
+  with check (
+    company_id in (
+      select company_id
+      from public.company_owners
+      where profile_id = auth.uid()
+    )
+  );
+
+create policy "Employees can view company business hours"
+  on public.company_business_hours
+  for select
+  using (
+    company_id in (
+      select company_id
+      from public.company_employees
+      where profile_id = auth.uid()
+    )
+  );
+
+grant select, insert, update, delete on table public.company_business_hours to authenticated;
+grant all on table public.company_business_hours to service_role;
+
+create trigger update_company_business_hours_updated_at
+  before update on public.company_business_hours
+  for each row execute function public.update_updated_at_column();
+
+
+-- END MIGRATION: 20250214_add_company_business_hours.sql
+
+
+-- BEGIN MIGRATION: 20250214_add_job_arrival_window.sql
+
+alter table public.jobs
+  add column arrival_window_start_time time,
+  add column arrival_window_end_time time;
+
+alter table public.jobs
+  add constraint jobs_arrival_window_time_check
+  check (
+    (arrival_window_start_time is null and arrival_window_end_time is null)
+    or (
+      arrival_window_start_time is not null
+      and arrival_window_end_time is not null
+      and arrival_window_start_time < arrival_window_end_time
+    )
+  );
+
+comment on column public.jobs.arrival_window_start_time is 'Preferred arrival window start time';
+comment on column public.jobs.arrival_window_end_time is 'Preferred arrival window end time';
+
+
+-- END MIGRATION: 20250214_add_job_arrival_window.sql
+
+
+-- BEGIN MIGRATION: 20250215_add_job_billing_hold.sql
+
+ALTER TABLE public.jobs
+  ADD COLUMN IF NOT EXISTS billing_hold boolean NOT NULL DEFAULT false;
+
+COMMENT ON COLUMN public.jobs.billing_hold IS 'Hide done jobs from assignments list until invoiced';
+
+
+-- END MIGRATION: 20250215_add_job_billing_hold.sql
+
+
+-- BEGIN MIGRATION: 20250216_add_suppliers.sql
+
+create table if not exists public.suppliers (
+  id uuid primary key default gen_random_uuid(),
+  company_id uuid not null references public.companies(id) on delete cascade,
+  label text,
+  name text not null,
+  phone text,
+  address text,
+  address_line_2 text,
+  city text,
+  state text,
+  zipcode text,
+  country text default 'USA',
+  account_number text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+comment on table public.suppliers is 'Suppliers and vendor contacts tracked by owners.';
+
+create index if not exists suppliers_company_idx
+  on public.suppliers(company_id);
+
+create index if not exists suppliers_company_label_idx
+  on public.suppliers(company_id, label);
+
+alter table public.suppliers enable row level security;
+
+create policy "Owners can manage suppliers"
+  on public.suppliers
+  for all
+  using (
+    company_id in (
+      select company_id
+      from public.company_owners
+      where profile_id = auth.uid()
+    )
+  )
+  with check (
+    company_id in (
+      select company_id
+      from public.company_owners
+      where profile_id = auth.uid()
+    )
+  );
+
+grant select, insert, update, delete on table public.suppliers to authenticated;
+grant all on table public.suppliers to service_role;
+
+create trigger update_suppliers_updated_at
+  before update on public.suppliers
+  for each row execute function public.update_updated_at_column();
+
+
+-- END MIGRATION: 20250216_add_suppliers.sql
+
+
+-- BEGIN MIGRATION: 20251206_add_payment_preferences.sql
+
+-- Add payment preference columns to companies table
+ALTER TABLE companies
+ADD COLUMN IF NOT EXISTS paypal_handle TEXT,
+ADD COLUMN IF NOT EXISTS zelle_phone TEXT,
+ADD COLUMN IF NOT EXISTS zelle_email TEXT,
+ADD COLUMN IF NOT EXISTS check_payable_to TEXT;
+
+-- Add comments for documentation
+COMMENT ON COLUMN companies.paypal_handle IS 'PayPal handle/username (without @ symbol)';
+COMMENT ON COLUMN companies.zelle_phone IS 'Zelle phone number for payments';
+COMMENT ON COLUMN companies.zelle_email IS 'Zelle email for payments';
+COMMENT ON COLUMN companies.check_payable_to IS 'Name for check payments';
+
+
+-- END MIGRATION: 20251206_add_payment_preferences.sql
+
+
+-- BEGIN MIGRATION: 20251206_create_company_logos_bucket.sql
+
+-- Create the company_logos storage bucket
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'company_logos',
+  'company_logos',
+  true,
+  5242880, -- 5MB limit
+  ARRAY['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml']
+)
+ON CONFLICT (id) DO UPDATE
+SET
+  public = true,
+  file_size_limit = 5242880,
+  allowed_mime_types = ARRAY['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/svg+xml'];
+
+-- Create policy to allow authenticated users to upload
+CREATE POLICY IF NOT EXISTS "Authenticated users can upload company logos"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'company_logos');
+
+-- Create policy to allow authenticated users to update their company logos
+CREATE POLICY IF NOT EXISTS "Authenticated users can update company logos"
+ON storage.objects FOR UPDATE
+TO authenticated
+USING (bucket_id = 'company_logos');
+
+-- Create policy to allow public read access
+CREATE POLICY IF NOT EXISTS "Public can view company logos"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'company_logos');
+
+-- Create policy to allow authenticated users to delete their company logos
+CREATE POLICY IF NOT EXISTS "Authenticated users can delete company logos"
+ON storage.objects FOR DELETE
+TO authenticated
+USING (bucket_id = 'company_logos');
+
+
+-- END MIGRATION: 20251206_create_company_logos_bucket.sql
+
+
+-- BEGIN MIGRATION: 20251207_add_payment_options_and_late_fees.sql
+
+0-- Add payment acceptance toggles and late fee settings to companies table
+ALTER TABLE companies
+ADD COLUMN IF NOT EXISTS accept_cash BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS accept_credit_debit BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS late_fee_enabled BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS late_fee_days INTEGER DEFAULT 30,
+ADD COLUMN IF NOT EXISTS late_fee_amount DECIMAL(10, 2) DEFAULT 0.00;
+
+-- Add comments for documentation
+COMMENT ON COLUMN companies.accept_cash IS 'Whether the company accepts cash payments';
+COMMENT ON COLUMN companies.accept_credit_debit IS 'Whether the company accepts credit/debit card payments';
+COMMENT ON COLUMN companies.late_fee_enabled IS 'Whether late fees are enabled for overdue invoices';
+COMMENT ON COLUMN companies.late_fee_days IS 'Number of days after receiving invoice before late fee applies';
+COMMENT ON COLUMN companies.late_fee_amount IS 'Late fee amount in dollars to be applied to unpaid balances';
+
+
+-- END MIGRATION: 20251207_add_payment_options_and_late_fees.sql
+
+
+-- BEGIN MIGRATION: 20251209_add_customer_archive.sql
+
+-- Add archival flags to customers without altering existing data
+ALTER TABLE customers
+ADD COLUMN IF NOT EXISTS archived BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP WITH TIME ZONE;
+
+COMMENT ON COLUMN customers.archived IS 'Soft-archive flag for customers';
+COMMENT ON COLUMN customers.archived_at IS 'Timestamp when the customer was archived';
+
+
+-- END MIGRATION: 20251209_add_customer_archive.sql
+
+
+-- BEGIN MIGRATION: 20251210_ensure_customer_archive_columns.sql
+
+-- Ensure customers can be soft-archived
+-- Adds archive columns when missing and enforces defaults for filtering
+ALTER TABLE customers
+ADD COLUMN IF NOT EXISTS archived BOOLEAN,
+ADD COLUMN IF NOT EXISTS archived_at TIMESTAMP WITH TIME ZONE;
+
+-- Make sure archived is always present and defaults to false
+ALTER TABLE customers
+ALTER COLUMN archived SET DEFAULT false;
+
+UPDATE customers
+SET archived = false
+WHERE archived IS NULL;
+
+ALTER TABLE customers
+ALTER COLUMN archived SET NOT NULL;
+
+COMMENT ON COLUMN customers.archived IS 'Soft-archive flag for customers';
+COMMENT ON COLUMN customers.archived_at IS 'Timestamp when the customer was archived';
+
+CREATE INDEX IF NOT EXISTS idx_customers_company_id_archived
+ON customers (company_id, archived);
+
+
+-- END MIGRATION: 20251210_ensure_customer_archive_columns.sql
+
+
+-- BEGIN MIGRATION: 20251211_add_invoice_audit_logs.sql
+
+-- Track invoice edits and deletions with metadata for compliance
+CREATE TABLE IF NOT EXISTS invoice_audit_logs (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id uuid NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  company_id uuid NOT NULL REFERENCES companies(id),
+  user_id uuid REFERENCES auth.users(id),
+  action text NOT NULL CHECK (action IN ('edit', 'delete')),
+  diff jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE invoice_audit_logs IS 'History of invoice edits and deletions for compliance auditing';
+COMMENT ON COLUMN invoice_audit_logs.diff IS 'JSON diff containing before/after invoice snapshots';
+
+CREATE INDEX IF NOT EXISTS idx_invoice_audit_logs_invoice_created
+  ON invoice_audit_logs (invoice_id, created_at DESC);
+
+
+-- END MIGRATION: 20251211_add_invoice_audit_logs.sql
+
+
+-- BEGIN MIGRATION: 20251212_add_customer_service_addresses.sql
+
+-- Support multiple service addresses per customer
+CREATE TABLE IF NOT EXISTS customer_service_addresses (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  company_id uuid NOT NULL REFERENCES companies(id),
+  label text NOT NULL DEFAULT 'Service Address',
+  address text,
+  address_line_2 text,
+  city text,
+  state text,
+  zipcode text,
+  country text DEFAULT 'USA',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+COMMENT ON TABLE customer_service_addresses IS 'Additional service locations for a customer';
+COMMENT ON COLUMN customer_service_addresses.label IS 'Friendly label to identify the property';
+
+CREATE INDEX IF NOT EXISTS idx_customer_service_addresses_customer
+  ON customer_service_addresses (customer_id);
+
+CREATE INDEX IF NOT EXISTS idx_customer_service_addresses_company
+  ON customer_service_addresses (company_id);
+
+
+-- END MIGRATION: 20251212_add_customer_service_addresses.sql

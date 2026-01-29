@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import { createServerClient, getActiveCompanyContext, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
 import { z } from 'zod'
 import { generatePayrollRun } from '@/lib/payroll'
 
@@ -21,6 +21,11 @@ const ListPayrollRunsQuerySchema = z.object({
   status: z.enum(['draft', 'finalized']).optional(),
   from_date: z.string().optional(),
   to_date: z.string().optional(),
+  company_id: z.string().uuid().optional(),
+})
+
+const CompanyQuerySchema = z.object({
+  company_id: z.string().uuid().optional(),
 })
 
 /**
@@ -35,6 +40,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const query = CompanyQuerySchema.parse(
+      Object.fromEntries(request.nextUrl.searchParams)
+    )
+
     // Get the owner's company IDs
     const companyIds = await getUserCompanyIds(supabase, user.id)
 
@@ -45,8 +54,25 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // For now, use the first company (most users have one)
-    const companyId = companyIds[0]
+    let companyId = companyIds[0]
+    if (query.company_id) {
+      if (!companyIds.includes(query.company_id)) {
+        return NextResponse.json(
+          { error: 'Unauthorized company access' },
+          { status: 403 }
+        )
+      }
+      companyId = query.company_id
+    } else {
+      const context = await getActiveCompanyContext(supabase, user.id)
+      if (
+        context?.active_role === 'owner' &&
+        context.active_company_id &&
+        companyIds.includes(context.active_company_id)
+      ) {
+        companyId = context.active_company_id
+      }
+    }
 
     // Parse and validate request body
     const body = await request.json()
@@ -141,6 +167,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('[Payroll] Error creating payroll run:', error)
 
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.issues },
+        { status: 422 }
+      )
+    }
+
     if (error instanceof Error) {
       return NextResponse.json(
         { error: error.message },
@@ -183,16 +216,37 @@ export async function GET(request: NextRequest) {
       status: searchParams.get('status') as any || undefined,
       from_date: searchParams.get('from_date') || undefined,
       to_date: searchParams.get('to_date') || undefined,
+      company_id: searchParams.get('company_id') || undefined,
     })
 
-    // Build query - support multiple companies
+    let companyId = companyIds[0]
+    if (query.company_id) {
+      if (!companyIds.includes(query.company_id)) {
+        return NextResponse.json(
+          { error: 'Unauthorized company access' },
+          { status: 403 }
+        )
+      }
+      companyId = query.company_id
+    } else {
+      const context = await getActiveCompanyContext(supabase, user.id)
+      if (
+        context?.active_role === 'owner' &&
+        context.active_company_id &&
+        companyIds.includes(context.active_company_id)
+      ) {
+        companyId = context.active_company_id
+      }
+    }
+
+    // Build query - scoped to active company
     let dbQuery = supabase
       .from('payroll_runs')
       .select(`
         *,
         lines:payroll_run_lines(count)
       `)
-      .in('company_id', companyIds)
+      .eq('company_id', companyId)
       .order('period_start', { ascending: false })
 
     // Apply filters

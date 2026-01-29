@@ -20,6 +20,7 @@ export function CustomersTableSkeleton() {
             <TableHead className="text-right">Billed Balance</TableHead>
             <TableHead className="text-right">Unapplied Credit</TableHead>
             <TableHead className="text-center">Open Invoices</TableHead>
+            <TableHead className="text-center">Unbilled Jobs</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -47,6 +48,9 @@ export function CustomersTableSkeleton() {
                 <div className="inline-flex items-center">
                   <Skeleton className="h-5 w-16" />
                 </div>
+              </TableCell>
+              <TableCell className="text-center">
+                <Skeleton className="h-5 w-8 mx-auto" />
               </TableCell>
               <TableCell className="text-center">
                 <Skeleton className="h-5 w-8 mx-auto" />

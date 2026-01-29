@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, getCurrentUser } from '@/lib/supabaseServer'
+import { getActiveEmployeeRecord, ServiceError } from '@/lib/services/companyContext'
 
 /**
  * GET - Get employee's payroll history
@@ -19,19 +20,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get the employee record for this user
-    const { data: employee, error: employeeError } = await supabase
-      .from('company_employees')
-      .select('id, company_id, job_title, hourly_rate')
-      .eq('profile_id', user.id)
-      .single()
-
-    if (employeeError || !employee) {
-      return NextResponse.json(
-        { error: 'Employee record not found' },
-        { status: 404 }
-      )
-    }
+    const { employee } = await getActiveEmployeeRecord(supabase, user.id)
 
     // Get all payroll runs that include this employee
     const { data: payrollLines, error: linesError } = await supabase
@@ -106,6 +95,9 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
     console.error('Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

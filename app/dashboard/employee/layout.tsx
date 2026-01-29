@@ -5,69 +5,61 @@ import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { EmployeeSidebar } from '@/components/dashboard/EmployeeSidebar'
-import { Shield, LogOut, Clock, HourglassIcon } from 'lucide-react'
+import { Shield, HourglassIcon } from 'lucide-react'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 
 export default function EmployeeLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth()
+  const { activeCompanyId, activeRole, memberships, loading: contextLoading } = useCompanyContext()
   const router = useRouter()
   const [isEmployee, setIsEmployee] = useState<boolean | null>(null)
   const [approvalStatus, setApprovalStatus] = useState<'approved' | 'pending' | 'rejected' | null>(null)
 
   useEffect(() => {
-    const verifyEmployee = async () => {
-      if (loading) return
+    if (loading || contextLoading) return
 
-      if (!user) {
-        router.push('/login')
-        return
-      }
-
-      if (!profile) {
-        router.push('/onboarding')
-        return
-      }
-
-      // Check if user is an owner (if so, redirect to owner dashboard)
-      const { data: ownerData } = await supabase
-        .from('company_owners')
-        .select('company_id')
-        .eq('profile_id', profile.id)
-        .limit(1)
-
-      if (ownerData && ownerData.length > 0) {
-        console.log('User is an owner, redirecting to owner dashboard')
-        router.push('/dashboard/owner')
-        return
-      }
-
-      // Check if user is an employee and approved
-      const { data: employeeData } = await supabase
-        .from('company_employees')
-        .select('id, approval_status')
-        .eq('profile_id', profile.id)
-        .limit(1)
-
-      if (employeeData && employeeData.length > 0) {
-        const employee = employeeData[0] as any
-        setApprovalStatus(employee.approval_status)
-
-        // Check if employee is approved
-        if (employee.approval_status === 'approved') {
-          setIsEmployee(true)
-        } else {
-          // Pending or rejected - show status screen
-          setIsEmployee(false)
-        }
-      } else {
-        // Not an employee either, redirect to onboarding
-        router.push('/onboarding')
-      }
+    if (!user) {
+      router.push('/login')
+      return
     }
 
-    verifyEmployee()
-  }, [user, profile, loading, router])
+    if (!profile) {
+      router.push('/onboarding')
+      return
+    }
 
-  if (loading || isEmployee === null) {
+    const hasOwnerRole = memberships.some((membership) =>
+      membership.roles.includes('owner')
+    )
+    const hasEmployeeRole = memberships.some((membership) =>
+      membership.roles.includes('employee')
+    )
+
+    if (!hasEmployeeRole) {
+      if (hasOwnerRole) {
+        router.push('/dashboard/owner')
+      } else {
+        router.push('/onboarding')
+      }
+      return
+    }
+
+    if (activeRole !== 'employee') {
+      if (hasOwnerRole) {
+        router.push('/dashboard/owner')
+      }
+      return
+    }
+
+    const activeMembership = memberships.find(
+      (membership) => membership.company_id === activeCompanyId
+    )
+    const status = activeMembership?.approval_status ?? null
+    setApprovalStatus(status)
+    setIsEmployee(status === 'approved')
+  }, [user, profile, loading, contextLoading, memberships, activeRole, activeCompanyId, router])
+
+  if (loading || contextLoading || isEmployee === null) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-cyan-900 via-slate-900 to-teal-950 flex items-center justify-center">
         <div className="text-xl text-cyan-200">Loading your quest...</div>
@@ -143,7 +135,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
 
   const menu = [
     {
-      label: 'Dashboard',
+      label: 'Quest Log',
       link: '/dashboard/employee',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
@@ -241,7 +233,7 @@ export default function EmployeeLayout({ children }: { children: React.ReactNode
               <div className="flex items-center gap-2 sm:gap-3 mb-1">
                 <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-cyan-400 flex-shrink-0" />
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-teal-400 truncate">
-                  Warrior Dashboard
+                  Quest Log
                 </h1>
               </div>
               <p className="mt-1 text-xs sm:text-sm text-cyan-200 truncate">

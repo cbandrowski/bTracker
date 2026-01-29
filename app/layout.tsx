@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cinzel, Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { CompanyProvider } from "@/contexts/CompanyContext";
 import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
@@ -54,8 +55,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${cinzel.variable} antialiased min-h-screen bg-[#0c0a08] text-[#f6e7c6]`}
       >
         <AuthProvider>
-          {children}
-          <Toaster />
+          <CompanyProvider>
+            {children}
+            <Toaster />
+          </CompanyProvider>
         </AuthProvider>
       </body>
     </html>

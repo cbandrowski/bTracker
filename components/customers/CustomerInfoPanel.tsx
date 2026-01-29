@@ -30,6 +30,19 @@ export function CustomerInfoPanel({
   const [editingAddress, setEditingAddress] = useState<CustomerServiceAddress | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  const normalizePhone = (phone: string | null | undefined) => {
+    if (!phone) return ''
+    return phone.replace(/\D/g, '')
+  }
+
+  const formatPhoneNumber = (phone: string | null | undefined) => {
+    const cleaned = normalizePhone(phone ?? null)
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    }
+    return phone || 'N/A'
+  }
+
   const formatAddress = (
     address?: string | null,
     addressLine2?: string | null,
@@ -126,14 +139,28 @@ export function CustomerInfoPanel({
           {customer.phone && (
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Phone</p>
-              <p className="text-base text-gray-900 dark:text-white">{customer.phone}</p>
+              <p className="text-base text-gray-900 dark:text-white">
+                <a
+                  href={`tel:${normalizePhone(customer.phone)}`}
+                  className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  {formatPhoneNumber(customer.phone)}
+                </a>
+              </p>
             </div>
           )}
 
           {customer.email && (
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">Email</p>
-              <p className="text-base text-gray-900 dark:text-white">{customer.email}</p>
+              <p className="text-base text-gray-900 dark:text-white">
+                <a
+                  href={`mailto:${customer.email}`}
+                  className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                >
+                  {customer.email}
+                </a>
+              </p>
             </div>
           )}
 

@@ -1,63 +1,39 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { CompanyEmployee, ApprovalStatus } from '@/types/database'
+import { employeesService } from '@/lib/services'
+import { ApprovalStatus, CompanyEmployee, Profile } from '@/types/database'
 import Link from 'next/link'
 
 interface EmployeeWithProfile extends CompanyEmployee {
-  hourly_rate?: number
-  profile?: {
-    full_name: string
-    email: string | null
-    phone: string | null
-  }
+  profile?: Profile | null
 }
 
 export default function TeamMembersPage() {
   const { profile } = useAuth()
+  const { activeCompanyId, loading: contextLoading } = useCompanyContext()
   const [employees, setEmployees] = useState<EmployeeWithProfile[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
   useEffect(() => {
     const fetchEmployees = async () => {
-      if (!profile?.id) {
-        setLoadingData(false)
+      if (!profile?.id || !activeCompanyId) {
+        if (!contextLoading) {
+          setLoadingData(false)
+        }
         return
       }
 
+      setLoadingData(true)
       try {
-        // Get the company the owner owns
-        const { data: ownerData } = await supabase
-          .from('company_owners')
-          .select('company_id')
-          .eq('profile_id', profile.id)
-          .single()
+        const response = await employeesService.getAll(activeCompanyId)
 
-        if (!ownerData) {
-          setLoadingData(false)
-          return
-        }
-
-        // Fetch all employees for this company
-        const { data: employeesData, error } = await supabase
-          .from('company_employees')
-          .select(`
-            *,
-            profile:profiles(
-              full_name,
-              email,
-              phone
-            )
-          `)
-          .eq('company_id', ownerData.company_id)
-          .order('created_at', { ascending: false })
-
-        if (error) {
-          console.error('Error fetching employees:', error)
+        if (response.error) {
+          console.error('Error fetching employees:', response.error)
         } else {
-          setEmployees((employeesData as any) || [])
+          setEmployees(response.data || [])
         }
       } catch (error) {
         console.error('Error:', error)
@@ -66,29 +42,31 @@ export default function TeamMembersPage() {
       setLoadingData(false)
     }
 
-    if (profile) {
+    if (profile && activeCompanyId) {
       fetchEmployees()
+    } else if (!contextLoading) {
+      setLoadingData(false)
     }
-  }, [profile])
+  }, [profile, activeCompanyId, contextLoading])
 
   const handleApprovalStatusChange = async (employeeId: string, newStatus: ApprovalStatus) => {
     try {
-      const { error } = await supabase
-        .from('company_employees')
-        .update({ approval_status: newStatus })
-        .eq('id', employeeId)
+      const response = await employeesService.update(employeeId, {
+        approval_status: newStatus,
+      })
 
-      if (error) {
-        console.error('Error updating approval status:', error)
+      if (response.error) {
+        console.error('Error updating approval status:', response.error)
         alert('Failed to update approval status')
         return
       }
 
       // Update local state
       setEmployees(prev =>
-        prev.map(emp =>
-          emp.id === employeeId ? { ...emp, approval_status: newStatus } : emp
-        )
+        prev.map(emp => {
+          if (emp.id !== employeeId) return emp
+          return response.data?.employee ?? { ...emp, approval_status: newStatus }
+        })
       )
     } catch (error) {
       console.error('Error:', error)
@@ -109,6 +87,38 @@ export default function TeamMembersPage() {
       default:
         return 'bg-gray-700 text-gray-300 border border-gray-600'
     }
+  }
+
+  const formatProfileAddress = (profile?: Profile | null) => {
+    if (!profile) return null
+
+    const street = [profile.address, profile.address_line_2]
+      .filter((part): part is string => Boolean(part))
+      .join(', ')
+
+    const cityStateZip = [profile.city, profile.state, profile.zipcode]
+      .filter((part): part is string => Boolean(part))
+      .join(', ')
+
+    const parts = [street, cityStateZip, profile.country]
+      .filter((part): part is string => Boolean(part))
+
+    if (parts.length === 0) return null
+
+    return parts.join(' • ')
+  }
+
+  const normalizePhone = (phone?: string | null) => {
+    if (!phone) return ''
+    return phone.replace(/\D/g, '')
+  }
+
+  const formatPhoneNumber = (phone?: string | null) => {
+    const cleaned = normalizePhone(phone)
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    }
+    return phone || 'N/A'
   }
 
   if (loadingData) {
@@ -148,10 +158,47 @@ export default function TeamMembersPage() {
                 <h3 className="text-white font-semibold text-lg mb-1">
                   {employee.profile?.full_name || 'Unknown'}
                 </h3>
-                <p className="text-gray-400 text-sm mb-2">{employee.profile?.email}</p>
                 {employee.job_title && (
-                  <p className="text-gray-500 text-sm mb-4">{employee.job_title}</p>
+                  <p className="text-gray-500 text-sm mb-2">{employee.job_title}</p>
                 )}
+                <dl className="text-sm text-gray-300 space-y-2 mb-4">
+                  <div className="flex items-start gap-2">
+                    <dt className="w-16 text-gray-500">Email</dt>
+                    <dd className="text-gray-200 break-all">
+                      {employee.profile?.email ? (
+                        <a
+                          href={`mailto:${employee.profile.email}`}
+                          className="text-blue-300 hover:text-blue-200"
+                        >
+                          {employee.profile.email}
+                        </a>
+                      ) : (
+                        'N/A'
+                      )}
+                    </dd>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <dt className="w-16 text-gray-500">Phone</dt>
+                    <dd className="text-gray-200">
+                      {employee.profile?.phone ? (
+                        <a
+                          href={`tel:${normalizePhone(employee.profile.phone)}`}
+                          className="text-blue-300 hover:text-blue-200"
+                        >
+                          {formatPhoneNumber(employee.profile.phone)}
+                        </a>
+                      ) : (
+                        'N/A'
+                      )}
+                    </dd>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <dt className="w-16 text-gray-500">Address</dt>
+                    <dd className="text-gray-200 break-words">
+                      {formatProfileAddress(employee.profile) || 'N/A'}
+                    </dd>
+                  </div>
+                </dl>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleApprovalStatusChange(employee.id, 'approved')}
@@ -185,7 +232,18 @@ export default function TeamMembersPage() {
                 <h3 className="text-white font-semibold text-lg">
                   {employee.profile?.full_name || 'Unknown'}
                 </h3>
-                <p className="text-gray-400 text-sm">{employee.profile?.email}</p>
+                <p className="text-gray-400 text-sm">
+                  {employee.profile?.email ? (
+                    <a
+                      href={`mailto:${employee.profile.email}`}
+                      className="text-blue-300 hover:text-blue-200"
+                    >
+                      {employee.profile.email}
+                    </a>
+                  ) : (
+                    'N/A'
+                  )}
+                </p>
               </div>
               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded ${getWorkStatusBadgeColor(employee.work_status)}`}>
                 {employee.work_status}
@@ -214,7 +272,12 @@ export default function TeamMembersPage() {
                   <svg className="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                   </svg>
-                  {employee.profile.phone}
+                  <a
+                    href={`tel:${normalizePhone(employee.profile.phone)}`}
+                    className="text-blue-300 hover:text-blue-200"
+                  >
+                    {formatPhoneNumber(employee.profile.phone)}
+                  </a>
                 </div>
               )}
             </div>

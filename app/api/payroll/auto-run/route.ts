@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import { z } from 'zod'
+import { createServerClient, getActiveCompanyContext, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
 import { generatePayrollRun } from '@/lib/payroll'
 
 const normalizeDate = (date: Date) => {
@@ -22,6 +23,10 @@ const computePeriod = (today: Date, startDay: number, endDay: number) => {
   return { startDate, endDate }
 }
 
+const CompanyQuerySchema = z.object({
+  company_id: z.string().uuid().optional(),
+})
+
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createServerClient()
@@ -31,12 +36,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const query = CompanyQuerySchema.parse(
+      Object.fromEntries(request.nextUrl.searchParams)
+    )
+
     const companyIds = await getUserCompanyIds(supabase, user.id)
     if (companyIds.length === 0) {
       return NextResponse.json({ error: 'No company found' }, { status: 404 })
     }
 
-    const companyId = companyIds[0]
+    let companyId = companyIds[0]
+    if (query.company_id) {
+      if (!companyIds.includes(query.company_id)) {
+        return NextResponse.json({ error: 'Unauthorized company access' }, { status: 403 })
+      }
+      companyId = query.company_id
+    } else {
+      const context = await getActiveCompanyContext(supabase, user.id)
+      if (
+        context?.active_role === 'owner' &&
+        context.active_company_id &&
+        companyIds.includes(context.active_company_id)
+      ) {
+        companyId = context.active_company_id
+      }
+    }
 
     const { data: settings } = await supabase
       .from('payroll_settings')
@@ -104,6 +128,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ status: 'error', error: message, period_end: endDateIso }, { status: 400 })
     }
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Validation error', details: err.issues }, { status: 422 })
+    }
     console.error('Payroll auto-run error', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }

@@ -14,6 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 
 interface PayrollRun {
   id: string
@@ -32,6 +33,20 @@ interface PayrollSettings {
   last_generated_end_date: string | null
 }
 
+interface CurrentPayrollSummary {
+  period_start: string
+  period_end: string
+  period_complete: boolean
+  status: 'run_exists' | 'in_progress' | 'ready' | 'pending_approval' | 'no_hours'
+  approved_hours: number
+  approved_entries: number
+  pending_entries: number
+  employees_with_hours: number
+  jobs_completed: number
+  existing_run_id?: string
+  existing_run_status?: 'draft' | 'finalized'
+}
+
 const DAY_OPTIONS = [
   { label: 'Sunday', value: 0 },
   { label: 'Monday', value: 1 },
@@ -44,6 +59,7 @@ const DAY_OPTIONS = [
 
 export default function PayrollPage() {
   const router = useRouter()
+  const { activeCompanyId, loading: contextLoading } = useCompanyContext()
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -60,24 +76,42 @@ export default function PayrollPage() {
   const [autoRunMessage, setAutoRunMessage] = useState<string | null>(null)
   const [settingsConfigured, setSettingsConfigured] = useState(false)
   const [showSettingsForm, setShowSettingsForm] = useState(false)
+  const [currentSummary, setCurrentSummary] = useState<CurrentPayrollSummary | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(true)
+  const [summaryError, setSummaryError] = useState<string | null>(null)
 
   useEffect(() => {
     fetchPayrollRuns()
-  }, [statusFilter])
+  }, [statusFilter, activeCompanyId, contextLoading])
 
   useEffect(() => {
     fetchSettings()
-  }, [])
+  }, [activeCompanyId, contextLoading])
+
+  useEffect(() => {
+    if (!settingsLoading) {
+      fetchCurrentSummary()
+    }
+  }, [settingsLoading, settings.period_start_day, settings.period_end_day, activeCompanyId, contextLoading])
 
   const fetchPayrollRuns = async () => {
     try {
       setLoading(true)
       setError(null)
 
+      if (!activeCompanyId) {
+        if (!contextLoading) {
+          setPayrollRuns([])
+          setLoading(false)
+        }
+        return
+      }
+
       const params = new URLSearchParams()
       if (statusFilter !== 'all') {
         params.append('status', statusFilter)
       }
+      params.append('company_id', activeCompanyId)
 
       const response = await fetch(`/api/payroll/runs?${params}`)
       if (!response.ok) {
@@ -97,7 +131,13 @@ export default function PayrollPage() {
     try {
       setSettingsLoading(true)
       setSettingsError(null)
-      const response = await fetch('/api/payroll/settings')
+      if (!activeCompanyId) {
+        if (!contextLoading) {
+          setSettingsLoading(false)
+        }
+        return
+      }
+      const response = await fetch(`/api/payroll/settings?company_id=${activeCompanyId}`)
       const data = await response.json()
       if (!response.ok) {
         throw new Error(data.error || 'Failed to load payroll settings')
@@ -110,7 +150,7 @@ export default function PayrollPage() {
       setShowSettingsForm(!hasSettings) // Show form if not configured
 
       // Trigger auto-run opportunistically
-      const autoResponse = await fetch('/api/payroll/auto-run', { method: 'POST' })
+      const autoResponse = await fetch(`/api/payroll/auto-run?company_id=${activeCompanyId}`, { method: 'POST' })
       const autoData = await autoResponse.json()
       if (autoData.status === 'created') {
         setAutoRunMessage(`Automatically created payroll ending ${autoData.period_end}`)
@@ -126,11 +166,40 @@ export default function PayrollPage() {
     }
   }
 
+  const fetchCurrentSummary = async () => {
+    try {
+      setSummaryLoading(true)
+      setSummaryError(null)
+
+      if (!activeCompanyId) {
+        if (!contextLoading) {
+          setSummaryLoading(false)
+        }
+        return
+      }
+
+      const response = await fetch(`/api/payroll/current-summary?company_id=${activeCompanyId}`)
+      const data = await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load current payroll summary')
+      }
+      setCurrentSummary(data)
+    } catch (err) {
+      setSummaryError(err instanceof Error ? err.message : 'Unable to load current payroll summary')
+    } finally {
+      setSummaryLoading(false)
+    }
+  }
+
   const saveSettings = async () => {
     try {
       setSavingSettings(true)
       setSettingsError(null)
-      const response = await fetch('/api/payroll/settings', {
+      if (!activeCompanyId) {
+        setSettingsError('No active company selected.')
+        return
+      }
+      const response = await fetch(`/api/payroll/settings?company_id=${activeCompanyId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settings),
@@ -143,6 +212,7 @@ export default function PayrollPage() {
       setSettingsConfigured(true)
       setShowSettingsForm(false)
       setAutoRunMessage('Settings saved successfully')
+      fetchCurrentSummary()
     } catch (err) {
       setSettingsError(err instanceof Error ? err.message : 'Unable to save settings')
     } finally {
@@ -152,6 +222,30 @@ export default function PayrollPage() {
 
   const getEmployeeCount = (run: PayrollRun) => {
     return run.lines?.[0]?.count || 0
+  }
+
+  const currentStatusLabel = (summary: CurrentPayrollSummary) => {
+    if (summary.status === 'run_exists') return 'Payroll Already Created'
+    if (summary.status === 'ready') return 'Ready to Generate'
+    if (summary.status === 'pending_approval') return 'Pending Approvals'
+    if (summary.status === 'no_hours') return 'No Hours Yet'
+    return 'In Progress'
+  }
+
+  const currentStatusStyles = (summary: CurrentPayrollSummary) => {
+    if (summary.status === 'run_exists') {
+      return 'bg-blue-900/40 text-blue-200 border border-blue-700'
+    }
+    if (summary.status === 'ready') {
+      return 'bg-green-900/40 text-green-200 border border-green-700'
+    }
+    if (summary.status === 'pending_approval') {
+      return 'bg-yellow-900/40 text-yellow-200 border border-yellow-700'
+    }
+    if (summary.status === 'no_hours') {
+      return 'bg-gray-700/50 text-gray-200 border border-gray-600'
+    }
+    return 'bg-purple-900/40 text-purple-200 border border-purple-700'
   }
 
   return (
@@ -168,6 +262,93 @@ export default function PayrollPage() {
         >
           New Payroll Run
         </Link>
+      </div>
+
+      {/* Current Payroll Snapshot */}
+      <div className="bg-gray-800 rounded-lg p-6 border border-gray-700 space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-white">Current Payroll Snapshot</h2>
+            <p className="text-sm text-gray-400">
+              Live totals for the current pay period.
+            </p>
+          </div>
+          {currentSummary && (
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${currentStatusStyles(currentSummary)}`}>
+              {currentStatusLabel(currentSummary)}
+            </span>
+          )}
+        </div>
+
+        {summaryError && (
+          <div className="text-sm text-red-300 bg-red-900/30 border border-red-800 rounded px-3 py-2">
+            {summaryError}
+          </div>
+        )}
+
+        {summaryLoading ? (
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <div className="h-4 w-4 animate-spin rounded-full border-b-2 border-blue-500"></div>
+            Loading current payroll summary...
+          </div>
+        ) : currentSummary ? (
+          <>
+            <div className="flex flex-wrap items-center gap-3 text-sm text-gray-300">
+              <span>
+                Period: {format(new Date(currentSummary.period_start), 'MMM d')} -{' '}
+                {format(new Date(currentSummary.period_end), 'MMM d, yyyy')}
+              </span>
+              {!currentSummary.period_complete && (
+                <span className="text-xs text-purple-200 bg-purple-900/40 border border-purple-700 px-2 py-0.5 rounded-full">
+                  Period open
+                </span>
+              )}
+              {currentSummary.existing_run_id && (
+                <Link
+                  href={`/dashboard/owner/payroll/${currentSummary.existing_run_id}`}
+                  className="text-blue-400 hover:text-blue-300 text-xs"
+                >
+                  View existing payroll run
+                </Link>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-3">
+                <p className="text-xs text-gray-400">Approved Hours</p>
+                <p className="text-lg font-semibold text-white">
+                  {currentSummary.approved_hours.toFixed(2)}
+                </p>
+              </div>
+              <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-3">
+                <p className="text-xs text-gray-400">Employees With Hours</p>
+                <p className="text-lg font-semibold text-white">
+                  {currentSummary.employees_with_hours}
+                </p>
+              </div>
+              <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-3">
+                <p className="text-xs text-gray-400">Approved Entries</p>
+                <p className="text-lg font-semibold text-white">
+                  {currentSummary.approved_entries}
+                </p>
+              </div>
+              <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-3">
+                <p className="text-xs text-gray-400">Pending Approvals</p>
+                <p className="text-lg font-semibold text-white">
+                  {currentSummary.pending_entries}
+                </p>
+              </div>
+              <div className="bg-gray-900/60 border border-gray-700 rounded-lg p-3">
+                <p className="text-xs text-gray-400">Jobs Completed</p>
+                <p className="text-lg font-semibold text-white">
+                  {currentSummary.jobs_completed}
+                </p>
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-gray-400">No current payroll summary available.</p>
+        )}
       </div>
 
       {/* Settings */}

@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createServerClient, getCurrentUser } from '@/lib/supabaseServer'
-import { getEmployeeByProfileId } from '@/lib/services/employees'
+import { getActiveEmployeeRecord, ServiceError } from '@/lib/services/companyContext'
 import {
   EmployeeAvailabilityInput,
   getEmployeeAvailabilityWeek,
@@ -74,11 +74,7 @@ export async function GET(_request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const employee = await getEmployeeByProfileId(supabase, user.id)
-
-    if (!employee) {
-      return NextResponse.json({ error: 'Employee record not found' }, { status: 404 })
-    }
+    const { employee } = await getActiveEmployeeRecord(supabase, user.id)
 
     const availability = await getEmployeeAvailabilityWeek(supabase, employee.company_id, employee.id)
 
@@ -86,6 +82,9 @@ export async function GET(_request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation error', details: error.issues }, { status: 422 })
+    }
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
     }
     console.error('Failed to load employee availability', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -101,11 +100,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const employee = await getEmployeeByProfileId(supabase, user.id)
-
-    if (!employee) {
-      return NextResponse.json({ error: 'Employee record not found' }, { status: 404 })
-    }
+    const { employee } = await getActiveEmployeeRecord(supabase, user.id)
 
     const body = await request.json()
     const parsedEntries = AvailabilityPayloadSchema.parse(body)
@@ -128,6 +123,9 @@ export async function PUT(request: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Validation error', details: error.issues }, { status: 422 })
+    }
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
     }
 
     console.error('Failed to save employee availability', error)

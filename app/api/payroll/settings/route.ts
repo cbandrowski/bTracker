@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import { createServerClient, getActiveCompanyContext, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
 
 const SettingsSchema = z.object({
   period_start_day: z.number().int().min(0).max(6),
@@ -8,7 +8,11 @@ const SettingsSchema = z.object({
   auto_generate: z.boolean().optional(),
 })
 
-export async function GET() {
+const CompanyQuerySchema = z.object({
+  company_id: z.string().uuid().optional(),
+})
+
+export async function GET(request: NextRequest) {
   try {
     const supabase = await createServerClient()
     const user = await getCurrentUser(supabase)
@@ -17,12 +21,31 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const query = CompanyQuerySchema.parse(
+      Object.fromEntries(request.nextUrl.searchParams)
+    )
+
     const companyIds = await getUserCompanyIds(supabase, user.id)
     if (companyIds.length === 0) {
       return NextResponse.json({ error: 'No company found' }, { status: 404 })
     }
 
-    const companyId = companyIds[0]
+    let companyId = companyIds[0]
+    if (query.company_id) {
+      if (!companyIds.includes(query.company_id)) {
+        return NextResponse.json({ error: 'Unauthorized company access' }, { status: 403 })
+      }
+      companyId = query.company_id
+    } else {
+      const context = await getActiveCompanyContext(supabase, user.id)
+      if (
+        context?.active_role === 'owner' &&
+        context.active_company_id &&
+        companyIds.includes(context.active_company_id)
+      ) {
+        companyId = context.active_company_id
+      }
+    }
 
     const { data, error } = await supabase
       .from('payroll_settings')
@@ -44,6 +67,9 @@ export async function GET() {
       }
     )
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Validation error', details: err.issues }, { status: 422 })
+    }
     console.error('Payroll settings GET error', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
@@ -58,12 +84,31 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const query = CompanyQuerySchema.parse(
+      Object.fromEntries(request.nextUrl.searchParams)
+    )
+
     const companyIds = await getUserCompanyIds(supabase, user.id)
     if (companyIds.length === 0) {
       return NextResponse.json({ error: 'No company found' }, { status: 404 })
     }
 
-    const companyId = companyIds[0]
+    let companyId = companyIds[0]
+    if (query.company_id) {
+      if (!companyIds.includes(query.company_id)) {
+        return NextResponse.json({ error: 'Unauthorized company access' }, { status: 403 })
+      }
+      companyId = query.company_id
+    } else {
+      const context = await getActiveCompanyContext(supabase, user.id)
+      if (
+        context?.active_role === 'owner' &&
+        context.active_company_id &&
+        companyIds.includes(context.active_company_id)
+      ) {
+        companyId = context.active_company_id
+      }
+    }
     const body = await request.json()
     const parsed = SettingsSchema.safeParse(body)
 
@@ -91,6 +136,9 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(data)
   } catch (err) {
+    if (err instanceof z.ZodError) {
+      return NextResponse.json({ error: 'Validation error', details: err.issues }, { status: 422 })
+    }
     console.error('Payroll settings PUT error', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
