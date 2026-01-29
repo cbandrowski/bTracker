@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { JobAssignment, Job, CompanyEmployee, AssignmentStatus } from '@/types/database'
@@ -27,11 +28,11 @@ const MIN_MINUTES_PER_BLOCK = 30
 
 export default function SchedulePage() {
   const { profile } = useAuth()
+  const { activeCompanyId, loading: contextLoading } = useCompanyContext()
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([])
   const [unassignedJobs, setUnassignedJobs] = useState<Array<Job & { customer?: { name: string } }>>([])
   const [employees, setEmployees] = useState<Array<{ id: string; full_name: string }>>([])
   const [loading, setLoading] = useState(true)
-  const [companyId, setCompanyId] = useState<string | null>(null)
 
   // View and filter states
   const [viewMode, setViewMode] = useState<ViewMode>('week')
@@ -43,26 +44,15 @@ export default function SchedulePage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!profile?.id) {
-        setLoading(false)
+      if (!profile?.id || !activeCompanyId) {
+        if (!contextLoading) {
+          setLoading(false)
+        }
         return
       }
 
+      setLoading(true)
       try {
-        // Get company
-        const { data: ownerData } = await supabase
-          .from('company_owners')
-          .select('company_id')
-          .eq('profile_id', profile.id)
-          .single()
-
-        if (!ownerData) {
-          setLoading(false)
-          return
-        }
-
-        setCompanyId(ownerData.company_id)
-
         // Fetch employees for filter dropdown
         const { data: employeesData } = await supabase
           .from('company_employees')
@@ -70,7 +60,7 @@ export default function SchedulePage() {
             id,
             profile:profiles(full_name)
           `)
-          .eq('company_id', ownerData.company_id)
+          .eq('company_id', activeCompanyId)
           .eq('employment_status', 'active')
           .eq('approval_status', 'approved')
           .order('profile(full_name)')
@@ -97,7 +87,7 @@ export default function SchedulePage() {
               profile:profiles(full_name, email)
             )
           `)
-          .eq('company_id', ownerData.company_id)
+          .eq('company_id', activeCompanyId)
           .order('service_start_at', { ascending: true })
 
         if (error) {
@@ -127,7 +117,7 @@ export default function SchedulePage() {
             *,
             customer:customers(name)
           `)
-          .eq('company_id', ownerData.company_id)
+          .eq('company_id', activeCompanyId)
           .neq('status', 'done')
           .order('planned_end_date', { ascending: true })
 
@@ -147,10 +137,12 @@ export default function SchedulePage() {
       setLoading(false)
     }
 
-    if (profile) {
+    if (profile && activeCompanyId) {
       fetchData()
+    } else if (!contextLoading) {
+      setLoading(false)
     }
-  }, [profile])
+  }, [profile, activeCompanyId, contextLoading])
 
   // Filter assignments based on status and employee
   const filteredAssignments = useMemo(() => {

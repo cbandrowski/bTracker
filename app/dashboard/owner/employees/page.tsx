@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { Profile, CompanyEmployee } from '@/types/database'
@@ -11,38 +12,28 @@ interface EmployeeWithProfile extends CompanyEmployee {
 
 export default function EmployeesPage() {
   const { profile } = useAuth()
+  const { activeCompanyId, loading: contextLoading } = useCompanyContext()
   const [employees, setEmployees] = useState<EmployeeWithProfile[]>([])
   const [loadingData, setLoadingData] = useState(true)
 
   useEffect(() => {
     const fetchEmployees = async () => {
-      if (!profile?.id) {
-        setLoadingData(false)
+      if (!profile?.id || !activeCompanyId) {
+        if (!contextLoading) {
+          setLoadingData(false)
+        }
         return
       }
 
+      setLoadingData(true)
       try {
-        // Get owned companies
-        const { data: ownerData } = await supabase
-          .from('company_owners')
-          .select('company_id')
-          .eq('profile_id', profile.id)
-
-        if (!ownerData || ownerData.length === 0) {
-          setLoadingData(false)
-          return
-        }
-
-        // Fetch employees for all owned companies
-        const companyIds = ownerData.map(o => o.company_id)
-
         const { data: employeesData } = await supabase
           .from('company_employees')
           .select(`
             *,
             profile:profiles(*)
           `)
-          .in('company_id', companyIds)
+          .eq('company_id', activeCompanyId)
           .neq('profile_id', profile.id)
 
         setEmployees((employeesData as any) || [])
@@ -53,10 +44,12 @@ export default function EmployeesPage() {
       setLoadingData(false)
     }
 
-    if (profile) {
+    if (profile && activeCompanyId) {
       fetchEmployees()
+    } else if (!contextLoading) {
+      setLoadingData(false)
     }
-  }, [profile])
+  }, [profile, activeCompanyId, contextLoading])
 
   const formatPhoneNumber = (phone: string | null) => {
     if (!phone) return 'N/A'

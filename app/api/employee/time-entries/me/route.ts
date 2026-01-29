@@ -6,6 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, getCurrentUser } from '@/lib/supabaseServer'
+import { getActiveEmployeeRecord, ServiceError } from '@/lib/services/companyContext'
 import { z } from 'zod'
 import { startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'
 
@@ -25,16 +26,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get employee record for this user
-    const { data: employee, error: employeeError } = await supabase
-      .from('company_employees')
-      .select('id, company_id')
-      .eq('profile_id', user.id)
-      .single()
-
-    if (employeeError || !employee) {
-      return NextResponse.json({ error: 'Employee record not found' }, { status: 404 })
-    }
+    const { employee } = await getActiveEmployeeRecord(supabase, user.id)
 
     // Parse query params
     const { searchParams } = new URL(request.url)
@@ -134,6 +126,9 @@ export async function GET(request: NextRequest) {
         { error: 'Validation error', details: error.issues },
         { status: 422 }
       )
+    }
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
     }
     console.error('Unexpected error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

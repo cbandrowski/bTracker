@@ -1,9 +1,10 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useEffect, useMemo, useState } from 'react'
 import { AssignmentStatus, CompanyEmployee, Customer, JobWithCustomer } from '@/types/database'
-import { assignmentsService, employeesService, jobsService, companiesService } from '@/lib/services'
+import { assignmentsService, employeesService, jobsService } from '@/lib/services'
 import JobCreationForm from '@/components/JobCreationForm'
 import { useSearchParams, useRouter } from 'next/navigation'
 
@@ -15,12 +16,14 @@ interface EmployeeWithProfile extends CompanyEmployee {
 
 interface JobAssignmentWithDetails {
   id: string
+  company_id: string
   job_id: string
   employee_id: string
   assignment_status: AssignmentStatus
-  service_start_at?: string
-  service_end_at?: string
-  worker_confirmed_done_at?: string
+  service_start_at?: string | null
+  service_end_at?: string | null
+  worker_confirmed_done_at?: string | null
+  notes?: string | null
   job?: JobWithCustomer
   employee?: EmployeeWithProfile
 }
@@ -39,14 +42,15 @@ type JobWithServiceTimes = JobWithCustomer & {
 
 export default function AssignmentsPage() {
   const { profile } = useAuth()
+  const { activeCompanyId, loading: contextLoading } = useCompanyContext()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [unassignedJobs, setUnassignedJobs] = useState<JobWithCustomer[]>([])
   const [assignments, setAssignments] = useState<JobAssignmentWithDetails[]>([])
   const [employees, setEmployees] = useState<EmployeeWithProfile[]>([])
   const [paidJobIds, setPaidJobIds] = useState<Set<string>>(new Set())
+  const [unbilledJobIds, setUnbilledJobIds] = useState<Set<string> | null>(null)
   const [loadingData, setLoadingData] = useState(true)
-  const [companyId, setCompanyId] = useState<string | null>(null)
   const [assigningJobId, setAssigningJobId] = useState<string | null>(null)
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string>('')
   const [showForm, setShowForm] = useState(false)
@@ -65,37 +69,35 @@ export default function AssignmentsPage() {
   }, [employees, profile?.id])
 
   const fetchData = async () => {
-    if (!profile?.id) {
-      setLoadingData(false)
+    if (!profile?.id || !activeCompanyId) {
+      if (!contextLoading) {
+        setLoadingData(false)
+      }
       return
     }
 
     try {
-      // Get owned companies
-      const companiesResponse = await companiesService.getAll()
-
-      if (companiesResponse.error || !companiesResponse.data || companiesResponse.data.length === 0) {
-        setLoadingData(false)
-        return
-      }
-
-      setCompanyId(companiesResponse.data[0].id)
-
       // Fetch all employees via API
       const employeesResponse = await employeesService.getAll()
       const employeesData = (employeesResponse.data || []) as EmployeeWithProfile[]
       const activeEmployees = employeesData.filter(
-        (emp) => emp.employment_status === 'active' && emp.approval_status === 'approved'
+        (emp) =>
+          emp.company_id === activeCompanyId &&
+          emp.employment_status === 'active' &&
+          emp.approval_status === 'approved'
       )
       setEmployees(activeEmployees)
 
       // Fetch all jobs via API
       const jobsResponse = await jobsService.getAll()
-      const allJobs = (jobsResponse.data || []).filter(job => job.status !== 'cancelled')
+      const allJobs = (jobsResponse.data || []).filter(
+        (job) => job.company_id === activeCompanyId && job.status !== 'cancelled'
+      )
 
       // Fetch all assignments via API
       const assignmentsResponse = await assignmentsService.getAll()
-      const assignmentsData = (assignmentsResponse.data || []) as JobAssignmentWithDetails[]
+      const assignmentsData = ((assignmentsResponse.data || []) as JobAssignmentWithDetails[])
+        .filter((assignment) => assignment.company_id === activeCompanyId)
       setAssignments(assignmentsData)
 
       // Fetch paid job IDs
@@ -109,6 +111,21 @@ export default function AssignmentsPage() {
         }
       } catch (error) {
         console.error('Error fetching paid jobs:', error)
+      }
+
+      // Fetch unbilled job IDs (done jobs without invoices)
+      try {
+        const unbilledResponse = await fetch('/api/billing/unbilled-jobs')
+        if (unbilledResponse.ok) {
+          const data = await unbilledResponse.json()
+          const jobIds = (data.jobs || []).map((job: { id: string }) => job.id)
+          setUnbilledJobIds(new Set(jobIds))
+        } else {
+          setUnbilledJobIds(null)
+        }
+      } catch (error) {
+        console.error('Error fetching unbilled jobs:', error)
+        setUnbilledJobIds(null)
       }
 
       // Filter unassigned jobs (jobs with no assignments and not paid)
@@ -127,10 +144,25 @@ export default function AssignmentsPage() {
   }
 
   useEffect(() => {
-    if (profile) {
+    if (profile && activeCompanyId) {
       fetchData()
+    } else if (!contextLoading) {
+      setLoadingData(false)
     }
-  }, [profile])
+  }, [profile, activeCompanyId, contextLoading])
+
+  useEffect(() => {
+    const handleFocus = () => {
+      if (profile?.id && activeCompanyId) {
+        fetchData()
+      }
+    }
+
+    window.addEventListener('focus', handleFocus)
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+    }
+  }, [profile?.id, activeCompanyId])
 
   // Check if we should open the create form from customer list
   useEffect(() => {
@@ -173,7 +205,7 @@ export default function AssignmentsPage() {
   }
 
   const handleAssignEmployee = async (jobId: string) => {
-    if (!companyId || !selectedEmployeeId) {
+    if (!activeCompanyId || !selectedEmployeeId) {
       alert('Please select an employee')
       return
     }
@@ -186,7 +218,7 @@ export default function AssignmentsPage() {
         service_start_at?: string
         service_end_at?: string
       } = {
-        company_id: companyId,
+        company_id: activeCompanyId,
         job_id: jobId,
         employee_id: selectedEmployeeId,
       }
@@ -343,7 +375,20 @@ export default function AssignmentsPage() {
 
   const assignedAssignments = filterAssignments(unpaidAssignments.filter(a => a.assignment_status === 'assigned'))
   const inProgressAssignments = filterAssignments(unpaidAssignments.filter(a => a.assignment_status === 'in_progress'))
-  const doneAssignments = filterAssignments(unpaidAssignments.filter(a => a.assignment_status === 'done'))
+  const heldAssignments = filterAssignments(
+    unpaidAssignments.filter(a =>
+      a.assignment_status === 'done' &&
+      (!unbilledJobIds || unbilledJobIds.has(a.job_id)) &&
+      a.job?.billing_hold
+    )
+  )
+  const readyDoneAssignments = filterAssignments(
+    unpaidAssignments.filter(a =>
+      a.assignment_status === 'done' &&
+      (!unbilledJobIds || unbilledJobIds.has(a.job_id)) &&
+      !a.job?.billing_hold
+    )
+  )
 
   // Group assignments by job
   const groupByJob = (assignments: JobAssignmentWithDetails[]) => {
@@ -362,7 +407,41 @@ export default function AssignmentsPage() {
 
   const groupedAssigned = groupByJob(assignedAssignments)
   const groupedInProgress = groupByJob(inProgressAssignments)
-  const groupedDone = groupByJob(doneAssignments)
+  const groupedDone = groupByJob(readyDoneAssignments)
+  const groupedHeldByCustomer = heldAssignments.reduce((acc, assignment) => {
+    const customer = assignment.job?.customer ?? null
+    const customerId = customer?.id || assignment.job?.customer_id
+    const key = customerId ?? 'unknown'
+
+    if (!acc[key]) {
+      acc[key] = {
+        customer,
+        customerId,
+        jobIds: new Set<string>(),
+        assignments: []
+      }
+    }
+
+    acc[key].jobIds.add(assignment.job_id)
+    acc[key].assignments.push(assignment)
+    return acc
+  }, {} as Record<string, {
+    customer: Customer | null
+    customerId?: string
+    jobIds: Set<string>
+    assignments: JobAssignmentWithDetails[]
+  }>)
+
+  const heldCustomerGroups = Object.entries(groupedHeldByCustomer)
+    .map(([key, group]) => ({
+      key,
+      ...group
+    }))
+    .sort((left, right) => {
+      const leftName = left.customer?.name || 'Unknown Client'
+      const rightName = right.customer?.name || 'Unknown Client'
+      return leftName.localeCompare(rightName)
+    })
 
   // Calculate employee workload
   const getEmployeeWorkload = (employeeId: string) => {
@@ -561,12 +640,39 @@ export default function AssignmentsPage() {
     )
   }
 
+  const handleCreateInvoice = (job?: JobWithCustomer) => {
+    if (!job?.id) {
+      return
+    }
+    const customerId = job.customer?.id || job.customer_id
+    if (!customerId) {
+      alert('Customer not found for this job.')
+      return
+    }
+    router.push(`/dashboard/owner/customers/${customerId}/billing?jobId=${job.id}`)
+  }
+
+  const handleBillingHoldChange = async (jobId: string, hold: boolean) => {
+    try {
+      const response = await jobsService.setBillingHold(jobId, hold)
+
+      if (response.error) throw new Error(response.error)
+
+      fetchData()
+      alert(hold ? 'Job saved for later invoicing.' : 'Job moved back to Done.')
+    } catch (error) {
+      console.error('Error updating billing hold:', error)
+      const message = error instanceof Error ? error.message : 'Failed to update job billing status'
+      alert(message)
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Create Job Form */}
-      {showForm && companyId && (
+      {showForm && activeCompanyId && (
         <JobCreationForm
-          companyId={companyId}
+          companyId={activeCompanyId}
           onSuccess={handleJobCreated}
           onCancel={() => {
             setShowForm(false)
@@ -889,7 +995,7 @@ export default function AssignmentsPage() {
                 <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                Done ({doneAssignments.length})
+                Done ({readyDoneAssignments.length})
               </h3>
             </div>
             <div className="p-3 space-y-4 max-h-[600px] overflow-y-auto">
@@ -898,31 +1004,61 @@ export default function AssignmentsPage() {
               ) : (
                 Object.values(groupedDone).map((group) => (
                   <div key={group.job?.id} className="bg-gray-800 p-3 rounded border border-gray-700">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (group.job?.id) {
-                          setExpandedJobId(expandedJobId === group.job.id ? null : group.job.id)
-                        }
-                      }}
-                      className="w-full text-left"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h4 className="text-white font-medium text-sm mb-1">{group.job?.title}</h4>
-                          <p className="text-gray-400 text-xs mb-3">
-                            {group.job?.customer?.name || 'Unknown'}
-                          </p>
+                    <div className="flex items-start justify-between gap-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (group.job?.id) {
+                            setExpandedJobId(expandedJobId === group.job.id ? null : group.job.id)
+                          }
+                        }}
+                        className="flex-1 text-left"
+                      >
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="text-white font-medium text-sm mb-1">{group.job?.title}</h4>
+                            <p className="text-gray-400 text-xs mb-3">
+                              {group.job?.customer?.name || 'Unknown'}
+                            </p>
+                          </div>
+                          <svg
+                            className={`w-4 h-4 text-gray-400 transition-transform ${expandedJobId === group.job?.id ? 'rotate-180' : ''}`}
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                          >
+                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
                         </div>
-                        <svg
-                          className={`w-4 h-4 text-gray-400 transition-transform ${expandedJobId === group.job?.id ? 'rotate-180' : ''}`}
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                    </button>
+                      </button>
+                      {group.job?.id && (
+                        <div className="flex flex-col gap-2">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleCreateInvoice(group.job)
+                            }}
+                            className="px-2 py-1 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                          >
+                            Create Invoice
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              const jobId = group.job?.id
+                              if (!jobId) {
+                                return
+                              }
+                              handleBillingHoldChange(jobId, true)
+                            }}
+                            className="px-2 py-1 text-xs rounded bg-gray-600 text-white hover:bg-gray-500"
+                          >
+                            Save For Later
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     {expandedJobId === group.job?.id && renderJobDetails(group.job)}
                     <div className="space-y-2">
                       {group.assignments.map((assignment) => (
@@ -942,6 +1078,51 @@ export default function AssignmentsPage() {
                           )}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Saved For Invoice Section */}
+          <div className="bg-gray-900 rounded-lg border-2 border-purple-500 overflow-hidden">
+            <div className="bg-purple-500 px-4 py-3">
+              <h3 className="text-white font-semibold flex items-center text-sm">
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 0013.586 3H4zm8 2a1 1 0 100 2h2V5h-2zm-8 0v10h12V9H3a1 1 0 010-2h2V5H4z" clipRule="evenodd" />
+                </svg>
+                Saved For Invoice ({heldCustomerGroups.length} clients)
+              </h3>
+            </div>
+            <div className="p-3 space-y-4 max-h-[600px] overflow-y-auto">
+              {heldCustomerGroups.length === 0 ? (
+                <p className="text-gray-500 text-sm text-center py-4">No saved jobs</p>
+              ) : (
+                heldCustomerGroups.map((group) => (
+                  <div key={group.key} className="bg-gray-800 p-3 rounded border border-gray-700">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <h4 className="text-white font-medium text-sm">
+                          {group.customer?.name || 'Unknown Client'}
+                        </h4>
+                        <p className="text-gray-400 text-xs">
+                          {group.jobIds.size} unbilled job{group.jobIds.size === 1 ? '' : 's'}
+                        </p>
+                      </div>
+                      {group.customerId ? (
+                        <button
+                          type="button"
+                          onClick={() => router.push(`/dashboard/owner/customers/${group.customerId}/billing`)}
+                          className="px-3 py-1.5 text-xs rounded bg-blue-600 text-white hover:bg-blue-700"
+                        >
+                          Open Billing
+                        </button>
+                      ) : (
+                        <span className="px-3 py-1.5 text-xs rounded bg-gray-700 text-gray-300">
+                          No billing profile
+                        </span>
+                      )}
                     </div>
                   </div>
                 ))

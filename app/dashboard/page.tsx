@@ -1,25 +1,28 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 
 export default function DashboardPage() {
   const { user, profile, loading } = useAuth()
+  const { memberships, activeRole, loading: contextLoading } = useCompanyContext()
   const router = useRouter()
 
   useEffect(() => {
     const redirectToCorrectDashboard = async () => {
       console.log('📊 Dashboard: Determining user role and redirecting', {
         loading,
+        contextLoading,
         user: !!user,
         userId: user?.id,
         profile: !!profile,
         profileId: profile?.id,
       })
 
-      if (loading) return
+      if (loading || contextLoading) return
 
       if (!user) {
         console.log('📊 Dashboard: No user, redirecting to login')
@@ -45,27 +48,19 @@ export default function DashboardPage() {
         return
       }
 
-      // Check if user is an owner
-      const { data: ownerData } = await supabase
-        .from('company_owners')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .limit(1)
+      if (memberships.length === 0) {
+        console.log('📊 Dashboard: User has no company, redirecting to onboarding')
+        router.push('/onboarding')
+        return
+      }
 
-      if (ownerData && ownerData.length > 0) {
+      if (activeRole === 'owner') {
         console.log('📊 Dashboard: User is an owner, redirecting to owner dashboard')
         router.push('/dashboard/owner')
         return
       }
 
-      // Check if user is an employee
-      const { data: employeeData } = await supabase
-        .from('company_employees')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .limit(1)
-
-      if (employeeData && employeeData.length > 0) {
+      if (activeRole === 'employee') {
         console.log('📊 Dashboard: User is an employee, redirecting to employee dashboard')
         router.push('/dashboard/employee')
         return
@@ -77,7 +72,7 @@ export default function DashboardPage() {
     }
 
     redirectToCorrectDashboard()
-  }, [user, loading, profile, router])
+  }, [user, loading, contextLoading, profile, memberships, activeRole, router])
 
   // Show loading screen while redirecting
   return (

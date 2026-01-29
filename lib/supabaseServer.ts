@@ -40,18 +40,38 @@ export async function getCurrentUser(supabase: Awaited<ReturnType<typeof createS
   return user
 }
 
+export type ActiveCompanyContext = {
+  active_company_id: string | null
+  active_role: 'owner' | 'employee' | null
+}
+
+export async function getActiveCompanyContext(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  userId: string
+): Promise<ActiveCompanyContext | null> {
+  const { data, error } = await supabase
+    .from('profile_company_context')
+    .select('active_company_id, active_role')
+    .eq('profile_id', userId)
+    .maybeSingle()
+
+  if (error || !data) {
+    return null
+  }
+
+  return {
+    active_company_id: data.active_company_id ?? null,
+    active_role: data.active_role ?? null,
+  }
+}
+
 // Get the company ID for the current user (owner)
 export async function getUserCompanyId(
   supabase: Awaited<ReturnType<typeof createServerClient>>,
   userId: string
 ): Promise<string | null> {
-  const { data } = await supabase
-    .from('company_owners')
-    .select('company_id')
-    .eq('profile_id', userId)
-    .single()
-
-  return data?.company_id || null
+  const companyIds = await getUserCompanyIds(supabase, userId)
+  return companyIds[0] || null
 }
 
 // Get all company IDs for the current user
@@ -64,7 +84,24 @@ export async function getUserCompanyIds(
     .select('company_id')
     .eq('profile_id', userId)
 
-  return data?.map((d) => d.company_id) || []
+  const companyIds = data?.map((d) => d.company_id) || []
+  if (companyIds.length === 0) {
+    return []
+  }
+
+  const context = await getActiveCompanyContext(supabase, userId)
+  if (
+    context?.active_role === 'owner' &&
+    context.active_company_id &&
+    companyIds.includes(context.active_company_id)
+  ) {
+    return [
+      context.active_company_id,
+      ...companyIds.filter((id) => id !== context.active_company_id),
+    ]
+  }
+
+  return companyIds
 }
 
 export type SupabaseServerClient = Awaited<ReturnType<typeof createServerClient>>

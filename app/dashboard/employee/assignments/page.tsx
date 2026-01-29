@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -17,10 +18,10 @@ interface AssignmentWithDetails extends JobAssignment {
 
 export default function EmployeeAssignmentsPage() {
   const { user, profile, loading } = useAuth()
+  const { activeEmployeeId, loading: contextLoading } = useCompanyContext()
   const router = useRouter()
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([])
   const [loadingData, setLoadingData] = useState(true)
-  const [employeeId, setEmployeeId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!loading) {
@@ -32,36 +33,16 @@ export default function EmployeeAssignmentsPage() {
     }
   }, [user, loading, profile, router])
 
-  // Get employee ID for the current user
-  useEffect(() => {
-    const getEmployeeId = async () => {
-      if (!profile?.id) return
-
-      const { data: employeeData } = await supabase
-        .from('company_employees')
-        .select('id')
-        .eq('profile_id', profile.id)
-        .single()
-
-      if (employeeData) {
-        setEmployeeId(employeeData.id)
-      }
-    }
-
-    if (profile) {
-      getEmployeeId()
-    }
-  }, [profile])
-
   useEffect(() => {
     const fetchAssignments = async () => {
-      if (!employeeId) {
+      if (!activeEmployeeId) {
         console.log('Employee Assignments: No employee ID yet')
         setLoadingData(false)
         return
       }
 
-      console.log('Employee Assignments: Fetching assignments for employee ID:', employeeId)
+      setLoadingData(true)
+      console.log('Employee Assignments: Fetching assignments for employee ID:', activeEmployeeId)
 
       try {
         const { data, error } = await supabase
@@ -74,7 +55,7 @@ export default function EmployeeAssignmentsPage() {
             ),
             profiles (*)
           `)
-          .eq('employee_id', employeeId)
+          .eq('employee_id', activeEmployeeId)
           .order('created_at', { ascending: false })
 
         if (error) {
@@ -90,10 +71,12 @@ export default function EmployeeAssignmentsPage() {
       setLoadingData(false)
     }
 
-    if (employeeId) {
+    if (activeEmployeeId) {
       fetchAssignments()
+    } else if (!contextLoading) {
+      setLoadingData(false)
     }
-  }, [employeeId])
+  }, [activeEmployeeId, contextLoading])
 
   const handleChangeAssignmentStatus = async (assignmentId: string, newStatus: AssignmentStatus) => {
     console.log('Attempting to change assignment status:', assignmentId, 'to', newStatus)
@@ -145,7 +128,37 @@ export default function EmployeeAssignmentsPage() {
   // Group assignments by status
   const assignedAssignments = assignments.filter(a => a.assignment_status === 'assigned')
   const inProgressAssignments = assignments.filter(a => a.assignment_status === 'in_progress')
-  const doneAssignments = assignments.filter(a => a.assignment_status === 'done')
+  const doneAssignmentsAll = assignments.filter(a => a.assignment_status === 'done')
+  const now = new Date()
+
+  const getCompletedDate = (assignment: AssignmentWithDetails) => {
+    const completedAt =
+      assignment.worker_confirmed_done_at ||
+      assignment.updated_at ||
+      assignment.service_end_at ||
+      assignment.service_start_at
+
+    if (!completedAt) {
+      return null
+    }
+
+    const parsed = new Date(completedAt)
+    return Number.isNaN(parsed.getTime()) ? null : parsed
+  }
+
+  const isSameDay = (left: Date, right: Date) => {
+    return (
+      left.getFullYear() === right.getFullYear() &&
+      left.getMonth() === right.getMonth() &&
+      left.getDate() === right.getDate()
+    )
+  }
+
+  const doneAssignmentsToday = doneAssignmentsAll.filter(assignment => {
+    const completedDate = getCompletedDate(assignment)
+    return completedDate ? isSameDay(completedDate, now) : false
+  })
+
 
   const renderAssignmentCard = (assignment: AssignmentWithDetails) => {
     const job = assignment.jobs
@@ -251,11 +264,12 @@ export default function EmployeeAssignmentsPage() {
       <div className="bg-yellow-900/50 border border-yellow-600 rounded-lg p-4">
         <h3 className="text-yellow-200 font-semibold mb-2">Debug Info</h3>
         <div className="text-sm text-yellow-100 space-y-1">
-          <div>Employee ID: {employeeId || 'Not found'}</div>
+          <div>Employee ID: {activeEmployeeId || 'Not found'}</div>
           <div>Total Assignments: {assignments.length}</div>
           <div>Assigned: {assignedAssignments.length}</div>
           <div>In Progress: {inProgressAssignments.length}</div>
-          <div>Done: {doneAssignments.length}</div>
+          <div>Done Today: {doneAssignmentsToday.length}</div>
+          <div>Total Done: {doneAssignmentsAll.length}</div>
         </div>
       </div>
 
@@ -305,22 +319,23 @@ export default function EmployeeAssignmentsPage() {
           {/* Done Column */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold guild-heading">Done</h3>
+              <h3 className="text-lg font-semibold guild-heading">Done Today</h3>
               <span className="inline-flex items-center justify-center w-8 h-8 bg-secondary text-secondary-foreground text-sm font-semibold rounded-full">
-                {doneAssignments.length}
+                {doneAssignmentsToday.length}
               </span>
             </div>
             <div className="space-y-3">
-              {doneAssignments.length > 0 ? (
-                doneAssignments.map(renderAssignmentCard)
+              {doneAssignmentsToday.length > 0 ? (
+                doneAssignmentsToday.map(renderAssignmentCard)
               ) : (
                 <div className="glass-surface rounded-lg p-4 text-center text-muted-foreground text-sm">
-                  No completed jobs
+                  No completed jobs today
                 </div>
               )}
             </div>
           </div>
         </div>
+
       </div>
     </div>
   )

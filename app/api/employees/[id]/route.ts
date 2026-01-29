@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import { getEmployeeWithProfileForOwner, ServiceError, updateEmployeeForOwner } from '@/lib/services/employees'
 import { z } from 'zod'
 
 // Validation schema for updating employee
@@ -16,6 +17,10 @@ const UpdateEmployeeSchema = z.object({
   work_status: z.enum(['available', 'inactive', 'vacation', 'sick']).optional(),
   approval_status: z.enum(['pending', 'approved', 'rejected']).optional(),
   department: z.string().optional().nullable(),
+})
+
+const EmployeeParamsSchema = z.object({
+  id: z.string().uuid(),
 })
 
 /**
@@ -35,36 +40,36 @@ export async function GET(
 
     const companyIds = await getUserCompanyIds(supabase, user.id)
     if (companyIds.length === 0) {
-      return NextResponse.json({ error: 'No company found' }, { status: 404 })
-    }
-
-    const { id: employeeId } = await params
-
-    // Fetch employee with profile
-    const { data: employee, error: employeeError } = await supabase
-      .from('company_employees')
-      .select(`
-        *,
-        profile:profiles(
-          id,
-          full_name,
-          email,
-          phone
-        )
-      `)
-      .eq('id', employeeId)
-      .in('company_id', companyIds)
-      .single()
-
-    if (employeeError || !employee) {
       return NextResponse.json(
-        { error: 'Employee not found' },
-        { status: 404 }
+        { error: 'No company found or you are not an owner' },
+        { status: 403 }
       )
     }
 
+    const { id: employeeId } = EmployeeParamsSchema.parse(await params)
+
+    const employee = await getEmployeeWithProfileForOwner(
+      supabase,
+      user.id,
+      employeeId
+    )
+
     return NextResponse.json({ employee })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.issues },
+        { status: 422 }
+      )
+    }
+
+    if (error instanceof ServiceError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
+      )
+    }
+
     console.error('Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },
@@ -90,10 +95,13 @@ export async function PATCH(
 
     const companyIds = await getUserCompanyIds(supabase, user.id)
     if (companyIds.length === 0) {
-      return NextResponse.json({ error: 'No company found' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'No company found or you are not an owner' },
+        { status: 403 }
+      )
     }
 
-    const { id: employeeId } = await params
+    const { id: employeeId } = EmployeeParamsSchema.parse(await params)
 
     // Parse and validate body
     const body = await request.json()
@@ -106,33 +114,12 @@ export async function PATCH(
       )
     }
 
-    // Update employee
-    const { data: employee, error: updateError } = await supabase
-      .from('company_employees')
-      .update({
-        ...validation.data,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', employeeId)
-      .in('company_id', companyIds)
-      .select(`
-        *,
-        profile:profiles(
-          id,
-          full_name,
-          email,
-          phone
-        )
-      `)
-      .single()
-
-    if (updateError) {
-      console.error('Error updating employee:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update employee' },
-        { status: 500 }
-      )
-    }
+    const employee = await updateEmployeeForOwner(
+      supabase,
+      user.id,
+      employeeId,
+      validation.data
+    )
 
     return NextResponse.json({
       employee,
@@ -143,6 +130,13 @@ export async function PATCH(
       return NextResponse.json(
         { error: 'Validation error', details: error.issues },
         { status: 422 }
+      )
+    }
+
+    if (error instanceof ServiceError) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.statusCode }
       )
     }
 

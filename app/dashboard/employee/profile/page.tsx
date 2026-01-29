@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { Company, CompanyEmployee, EmployeeAvailability } from '@/types/database'
@@ -10,26 +11,35 @@ import Image from 'next/image'
 
 export default function EmployeeProfilePage() {
   const { user, profile } = useAuth()
+  const { activeEmployeeId, activeCompanyId, memberships, loading: contextLoading } = useCompanyContext()
   const [company, setCompany] = useState<Company | null>(null)
   const [loadingData, setLoadingData] = useState(true)
   const [employeeData, setEmployeeData] = useState<CompanyEmployee | null>(null)
   const [availability, setAvailability] = useState<AvailabilityRow[]>(DEFAULT_AVAILABILITY)
   const [availabilityLoading, setAvailabilityLoading] = useState(true)
   const [savingAvailability, setSavingAvailability] = useState(false)
+  const [availabilityEditMode, setAvailabilityEditMode] = useState(false)
   const { toast } = useToast()
+  const [joiningCompany, setJoiningCompany] = useState(false)
+  const [companyCode, setCompanyCode] = useState('')
+  const [matchedCompanyName, setMatchedCompanyName] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchCompanyData = async () => {
-      if (!profile?.id) {
-        setLoadingData(false)
+      if (!activeEmployeeId || !activeCompanyId) {
+        if (!contextLoading) {
+          setLoadingData(false)
+        }
         return
       }
 
+      setLoadingData(true)
       try {
         const { data: employeeData } = await supabase
           .from('company_employees')
           .select('*, company_id, companies(*)')
-          .eq('profile_id', profile.id)
+          .eq('id', activeEmployeeId)
+          .eq('company_id', activeCompanyId)
           .single()
 
         if (employeeData) {
@@ -44,10 +54,12 @@ export default function EmployeeProfilePage() {
       setLoadingData(false)
     }
 
-    if (profile) {
+    if (activeEmployeeId && activeCompanyId) {
       fetchCompanyData()
+    } else if (!contextLoading) {
+      setLoadingData(false)
     }
-  }, [profile])
+  }, [activeEmployeeId, activeCompanyId, contextLoading])
 
   useEffect(() => {
     const fetchAvailability = async () => {
@@ -90,6 +102,10 @@ export default function EmployeeProfilePage() {
   const hasAvailabilityErrors = useMemo(
     () => Object.values(availabilityErrors).some((error) => Boolean(error)),
     [availabilityErrors]
+  )
+  const availabilitySummary = useMemo(
+    () => availability.filter((row) => row.is_available),
+    [availability]
   )
 
   const formatPhoneNumber = (phone: string | null) => {
@@ -185,6 +201,7 @@ export default function EmployeeProfilePage() {
       }
 
       setAvailability(mapAvailabilityFromServer(payload?.availability))
+      setAvailabilityEditMode(false)
 
       toast({
         title: 'Availability saved',
@@ -200,6 +217,77 @@ export default function EmployeeProfilePage() {
       })
     } finally {
       setSavingAvailability(false)
+    }
+  }
+
+  const lookupCompany = async (code: string) => {
+    if (!code || code.length < 3) {
+      setMatchedCompanyName(null)
+      return
+    }
+
+    try {
+      const { data: company, error } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('company_code', code.toUpperCase())
+        .maybeSingle()
+
+      if (error) {
+        console.error('Error looking up company:', error)
+        setMatchedCompanyName(null)
+        return
+      }
+
+      if (company) {
+        setMatchedCompanyName(company.name)
+      } else {
+        setMatchedCompanyName(null)
+      }
+    } catch (err) {
+      console.error('Error looking up company:', err)
+      setMatchedCompanyName(null)
+    }
+  }
+
+  const handleJoinCompany = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setJoiningCompany(true)
+
+    try {
+      const response = await fetch('/api/employee/join-company', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ company_code: companyCode }),
+      })
+
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(payload?.error || 'Failed to join company')
+      }
+
+      toast({
+        title: 'Successfully joined company',
+        description: `You've joined ${payload.company.name}. Awaiting approval from the guild master.`,
+        variant: 'success',
+      })
+
+      setCompanyCode('')
+      setMatchedCompanyName(null)
+
+      // Refresh company context
+      window.location.reload()
+    } catch (error) {
+      console.error('Failed to join company', error)
+      toast({
+        title: 'Failed to join company',
+        description: error instanceof Error ? error.message : 'Please try again.',
+        variant: 'destructive',
+      })
+    } finally {
+      setJoiningCompany(false)
     }
   }
 
@@ -312,6 +400,74 @@ export default function EmployeeProfilePage() {
         </dl>
       </div>
 
+      <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+        <h2 className="text-lg font-semibold text-white mb-4">My Companies</h2>
+        <p className="text-sm text-gray-400 mb-4">
+          Companies you're part of. Use the dropdown in the sidebar to switch between them.
+        </p>
+
+        {memberships.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No company memberships found.</p>
+        ) : (
+          <div className="space-y-3">
+            {memberships.map((membership) => (
+              <div
+                key={membership.company_id}
+                className={`p-4 rounded-lg border ${
+                  membership.company_id === activeCompanyId
+                    ? 'bg-cyan-900/30 border-cyan-500/50'
+                    : 'bg-gray-900/50 border-gray-600/30'
+                }`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-medium text-white">
+                        {membership.company_name || 'Unknown Company'}
+                      </h3>
+                      {membership.company_id === activeCompanyId && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-cyan-600 text-white">
+                          Active
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {membership.roles.map((role) => (
+                        <span
+                          key={role}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            role === 'owner'
+                              ? 'bg-amber-600 text-white'
+                              : 'bg-green-600 text-white'
+                          }`}
+                        >
+                          {role === 'owner' ? 'Guild Master' : 'Warrior'}
+                        </span>
+                      ))}
+
+                      {membership.approval_status && (
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            membership.approval_status === 'approved'
+                              ? 'bg-green-600 text-white'
+                              : membership.approval_status === 'pending'
+                              ? 'bg-yellow-600 text-white'
+                              : 'bg-red-600 text-white'
+                          }`}
+                        >
+                          {membership.approval_status}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       {company ? (
         <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
           <h2 className="text-lg font-semibold text-white mb-4">Company Information</h2>
@@ -391,36 +547,109 @@ export default function EmployeeProfilePage() {
       )}
 
       <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
+        <h2 className="text-lg font-semibold text-white mb-4">Join Additional Companies</h2>
+        <p className="text-sm text-gray-400 mb-4">
+          Enter a company code to join another guild. You can work for multiple companies and switch between them using the dropdown in the sidebar.
+        </p>
+
+        <form onSubmit={handleJoinCompany} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-400 mb-2">Company Code</label>
+            <input
+              type="text"
+              value={companyCode}
+              onChange={(e) => {
+                const code = e.target.value.toUpperCase()
+                setCompanyCode(code)
+                lookupCompany(code)
+              }}
+              placeholder="Enter company code"
+              className="block w-full rounded-lg border border-gray-600 shadow-sm focus:border-cyan-500 focus:ring-2 focus:ring-cyan-500 px-4 py-2 bg-gray-900 text-white placeholder-gray-500 uppercase font-mono"
+              disabled={joiningCompany}
+            />
+
+            {matchedCompanyName && (
+              <div className="mt-3 p-3 bg-green-900/50 border border-green-500/50 rounded-lg">
+                <p className="text-sm text-green-200">
+                  <strong>Guild found:</strong> {matchedCompanyName}
+                </p>
+              </div>
+            )}
+
+            {companyCode && !matchedCompanyName && companyCode.length >= 3 && (
+              <div className="mt-3 p-3 bg-yellow-900/50 border border-yellow-500/50 rounded-lg">
+                <p className="text-sm text-yellow-200">
+                  No guild found with this code. Please verify the code.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <Button
+            type="submit"
+            disabled={joiningCompany || !companyCode || !matchedCompanyName}
+            className="w-full"
+          >
+            {joiningCompany ? 'Joining Guild...' : 'Join Guild'}
+          </Button>
+
+          <p className="text-xs text-gray-400 italic">
+            Note: Your request will be pending until approved by the guild master.
+          </p>
+        </form>
+      </div>
+
+      <div className="bg-gray-800 shadow-lg rounded-lg p-6 border border-gray-700">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
           <div>
             <h2 className="text-lg font-semibold text-white">Availability (Weekly)</h2>
             <p className="text-sm text-gray-400">Share when you are available to work.</p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          {availabilityEditMode ? (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={savingAvailability}
+                onClick={() => setAvailabilityEditMode(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={availabilityLoading || savingAvailability}
+                onClick={handleCopyMondayToWeekdays}
+              >
+                Copy Monday to weekdays
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                disabled={availabilityLoading || savingAvailability || hasAvailabilityErrors}
+                onClick={handleSaveAvailability}
+              >
+                {savingAvailability ? 'Saving...' : 'Save Availability'}
+              </Button>
+            </div>
+          ) : (
             <Button
               type="button"
+              size="sm"
               variant="outline"
-              size="sm"
-              disabled={availabilityLoading || savingAvailability}
-              onClick={handleCopyMondayToWeekdays}
+              onClick={() => setAvailabilityEditMode(true)}
             >
-              Copy Monday to weekdays
+              Edit
             </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={availabilityLoading || savingAvailability || hasAvailabilityErrors}
-              onClick={handleSaveAvailability}
-            >
-              {savingAvailability ? 'Saving...' : 'Save Availability'}
-            </Button>
-          </div>
+          )}
         </div>
 
         {availabilityLoading ? (
           <p className="text-sm text-gray-400">Loading availability...</p>
-        ) : (
+        ) : availabilityEditMode ? (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-700">
               <thead>
@@ -488,6 +717,19 @@ export default function EmployeeProfilePage() {
               </tbody>
             </table>
           </div>
+        ) : availabilitySummary.length === 0 ? (
+          <p className="text-sm text-gray-400 italic">No availability set yet.</p>
+        ) : (
+          <div className="space-y-2 text-sm text-gray-200">
+            {availabilitySummary.map((day) => (
+              <div key={day.day_of_week} className="flex flex-wrap gap-2">
+                <span className="font-medium text-white">{day.label}:</span>
+                <span>
+                  {formatTimeValue(day.start_time)} - {formatTimeValue(day.end_time)}
+                </span>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -547,4 +789,17 @@ function validateAvailabilityRow(row: AvailabilityRow): string | null {
   }
 
   return null
+}
+
+function formatTimeValue(value: string) {
+  if (!value) return 'N/A'
+  const [hoursStr, minutesStr] = value.split(':')
+  const hours = Number(hoursStr)
+  const minutes = Number(minutesStr)
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return 'N/A'
+  }
+  const date = new Date()
+  date.setHours(hours, minutes, 0, 0)
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }

@@ -16,6 +16,19 @@ export function CustomerHeader({ customer }: CustomerHeaderProps) {
   const [isActive] = useState(true) // TODO: Add customer status to schema if needed
   const [deleting, setDeleting] = useState(false)
 
+  const normalizePhone = (phone: string | null | undefined) => {
+    if (!phone) return ''
+    return phone.replace(/\D/g, '')
+  }
+
+  const formatPhoneNumber = (phone: string | null | undefined) => {
+    const cleaned = normalizePhone(phone ?? null)
+    if (cleaned.length === 10) {
+      return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
+    }
+    return phone || 'N/A'
+  }
+
   const handleNewJob = () => {
     // TODO: Navigate to job creation with prefilled customerId
     router.push(`/dashboard/owner/jobs/new?customerId=${customer.id}`)
@@ -78,12 +91,24 @@ export function CustomerHeader({ customer }: CustomerHeaderProps) {
             <div className="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
               {customer.phone && (
                 <span className="flex items-center gap-1">
-                  <span className="font-medium">Phone:</span> {customer.phone}
+                  <span className="font-medium">Phone:</span>
+                  <a
+                    href={`tel:${normalizePhone(customer.phone)}`}
+                    className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    {formatPhoneNumber(customer.phone)}
+                  </a>
                 </span>
               )}
               {customer.email && (
                 <span className="flex items-center gap-1">
-                  <span className="font-medium">Email:</span> {customer.email}
+                  <span className="font-medium">Email:</span>
+                  <a
+                    href={`mailto:${customer.email}`}
+                    className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    {customer.email}
+                  </a>
                 </span>
               )}
             </div>

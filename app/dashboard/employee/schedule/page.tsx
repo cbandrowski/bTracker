@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useEffect, useState, useMemo } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { JobAssignment, Job, AssignmentStatus } from '@/types/database'
@@ -20,10 +20,9 @@ const HOUR_BLOCK_HEIGHT = 64
 const MIN_MINUTES_PER_BLOCK = 30
 
 export default function EmployeeSchedulePage() {
-  const { profile } = useAuth()
+  const { activeEmployeeId, loading: contextLoading } = useCompanyContext()
   const [assignments, setAssignments] = useState<AssignmentWithDetails[]>([])
   const [loading, setLoading] = useState(true)
-  const [employeeId, setEmployeeId] = useState<string | null>(null)
 
   // View and filter states
   const [viewMode, setViewMode] = useState<ViewMode>('week')
@@ -34,28 +33,13 @@ export default function EmployeeSchedulePage() {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!profile?.id) {
+      if (!activeEmployeeId) {
         setLoading(false)
         return
       }
 
+      setLoading(true)
       try {
-        // Get employee record for current user
-        const { data: employeeData } = await supabase
-          .from('company_employees')
-          .select('id, company_id')
-          .eq('profile_id', profile.id)
-          .eq('employment_status', 'active')
-          .eq('approval_status', 'approved')
-          .single()
-
-        if (!employeeData) {
-          setLoading(false)
-          return
-        }
-
-        setEmployeeId(employeeData.id)
-
         // Fetch only assignments for this employee
         const { data: assignmentsData, error } = await supabase
           .from('job_assignments')
@@ -66,7 +50,7 @@ export default function EmployeeSchedulePage() {
               customer:customers(name)
             )
           `)
-          .eq('employee_id', employeeData.id)
+          .eq('employee_id', activeEmployeeId)
           .order('service_start_at', { ascending: true })
 
         if (error) {
@@ -81,10 +65,12 @@ export default function EmployeeSchedulePage() {
       setLoading(false)
     }
 
-    if (profile) {
+    if (activeEmployeeId) {
       fetchData()
+    } else if (!contextLoading) {
+      setLoading(false)
     }
-  }, [profile])
+  }, [activeEmployeeId, contextLoading])
 
   // Filter assignments based on status
   const filteredAssignments = useMemo(() => {
@@ -278,7 +264,7 @@ export default function EmployeeSchedulePage() {
     )
   }
 
-  if (!employeeId) {
+  if (!activeEmployeeId) {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center">

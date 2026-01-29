@@ -2,7 +2,7 @@
 // Provides type-safe methods for all backend API routes
 
 import { api } from '../api'
-import { AssignmentStatus, Company, CompanyEmployee, Customer, CustomerServiceAddress, InvoiceStatus, Job, JobAssignment, JobWithCustomer, Profile } from '@/types/database'
+import { ApprovalStatus, AssignmentStatus, Company, CompanyEmployee, Customer, CustomerServiceAddress, InvoiceStatus, Job, JobAssignment, JobWithCustomer, Profile, Supplier, WorkStatus } from '@/types/database'
 
 type CustomerStatus = 'active' | 'archived' | 'all'
 
@@ -92,6 +92,24 @@ export const customerAddressesService = {
 }
 
 // ============================================================================
+// SUPPLIERS SERVICE
+// ============================================================================
+
+export const suppliersService = {
+  async getAll() {
+    return api.get<Supplier[]>('/suppliers')
+  },
+
+  async create(supplierData: Omit<Supplier, 'id' | 'created_at' | 'updated_at'>) {
+    return api.post<Supplier>('/suppliers', supplierData)
+  },
+
+  async update(id: string, supplierData: Partial<Omit<Supplier, 'id' | 'company_id' | 'created_at' | 'updated_at'>>) {
+    return api.patch<Supplier>(`/suppliers/${id}`, supplierData)
+  },
+}
+
+// ============================================================================
 // JOBS SERVICE
 // ============================================================================
 
@@ -107,13 +125,19 @@ export const jobsService = {
   },
 
   // Create a new job
-  async create(jobData: Omit<Job, 'id' | 'created_at' | 'updated_at'>) {
+  async create(jobData: Omit<Job, 'id' | 'created_at' | 'updated_at' | 'billing_hold'>) {
     return api.post<JobWithCustomer>('/jobs', jobData)
   },
 
   // Update a job
   async update(id: string, jobData: Partial<Job>) {
     return api.put<JobWithCustomer>(`/jobs/${id}`, jobData)
+  },
+
+  async setBillingHold(id: string, billingHold: boolean) {
+    return api.patch<{ job: JobWithCustomer }>(`/jobs/${id}/billing-hold`, {
+      billing_hold: billingHold,
+    })
   },
 
   // Delete a job
@@ -179,13 +203,30 @@ export const assignmentsService = {
 
 export const employeesService = {
   // Get all employees
-  async getAll() {
-    return api.get<(CompanyEmployee & { profile?: Profile | null })[]>('/employees')
+  async getAll(companyId?: string) {
+    const query = companyId ? `?company_id=${encodeURIComponent(companyId)}` : ''
+    return api.get<(CompanyEmployee & { profile?: Profile | null })[]>(`/employees${query}`)
   },
 
   async getById(id: string) {
     return api.get<{ employee: CompanyEmployee & { profile?: Profile | null } }>(
       `/employees/${id}`
+    )
+  },
+
+  async update(
+    id: string,
+    payload: {
+      job_title?: string | null
+      hourly_rate?: number | null
+      work_status?: WorkStatus
+      approval_status?: ApprovalStatus
+      department?: string | null
+    }
+  ) {
+    return api.patch<{ employee: CompanyEmployee & { profile?: Profile | null } }>(
+      `/employees/${id}`,
+      payload
     )
   },
 }

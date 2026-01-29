@@ -110,7 +110,7 @@ export function CustomersTable({
       if (customer.name?.toLowerCase().includes(query)) return true
 
       // Search in phone (strip formatting from both)
-      const cleanPhone = customer.phone?.replace(/\D/g, '') || ''
+      const cleanPhone = normalizePhone(customer.phone)
       const cleanQuery = query.replace(/\D/g, '')
       if (cleanQuery && cleanPhone.includes(cleanQuery)) return true
 
@@ -178,9 +178,14 @@ export function CustomersTable({
     }).format(amount)
   }
 
-  const formatPhoneNumber = (phone: string | null) => {
+  function normalizePhone(phone: string | null) {
+    if (!phone) return ''
+    return phone.replace(/\D/g, '')
+  }
+
+  function formatPhoneNumber(phone: string | null) {
     if (!phone) return '-'
-    const cleaned = phone.replace(/\D/g, '')
+    const cleaned = normalizePhone(phone)
     if (cleaned.length === 10) {
       return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6)}`
     }
@@ -346,19 +351,29 @@ export function CustomersTable({
               {customer.email && (
                 <p className="text-gray-300">
                   <span className="text-gray-400">Email: </span>
-                  {customer.email}
+                  <a
+                    href={`mailto:${customer.email}`}
+                    className="text-blue-300 hover:text-blue-200"
+                  >
+                    {customer.email}
+                  </a>
                 </p>
               )}
               {customer.phone && (
                 <p className="text-gray-300">
                   <span className="text-gray-400">Phone: </span>
-                  {formatPhoneNumber(customer.phone)}
+                  <a
+                    href={`tel:${normalizePhone(customer.phone)}`}
+                    className="text-blue-300 hover:text-blue-200"
+                  >
+                    {formatPhoneNumber(customer.phone)}
+                  </a>
                 </p>
               )}
             </div>
 
             {/* Financial Info */}
-            <div className="grid grid-cols-3 gap-2 pt-2 border-t border-purple-500/20">
+            <div className="grid grid-cols-4 gap-2 pt-2 border-t border-purple-500/20">
               <div>
                 <p className="text-xs text-gray-400 mb-1">Balance</p>
                 <Badge
@@ -389,6 +404,16 @@ export function CustomersTable({
                 {customer.openInvoices > 0 ? (
                   <Badge variant="outline" className="text-xs">
                     {customer.openInvoices}
+                  </Badge>
+                ) : (
+                  <span className="text-sm text-gray-400">-</span>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 mb-1">Unbilled</p>
+                {customer.unbilledJobs > 0 ? (
+                  <Badge variant="outline" className="text-xs">
+                    {customer.unbilledJobs}
                   </Badge>
                 ) : (
                   <span className="text-sm text-gray-400">-</span>
@@ -711,6 +736,25 @@ export function CustomersTable({
                 </div>
               </TableHead>
               <TableHead className="text-center whitespace-nowrap">Open Invoices</TableHead>
+              <TableHead
+                className="cursor-pointer select-none text-center whitespace-nowrap"
+                onClick={() => handleSort('unbilledJobs')}
+                role="button"
+                aria-sort={
+                  sortColumn === 'unbilledJobs'
+                    ? sortDirection === 'asc'
+                      ? 'ascending'
+                      : 'descending'
+                    : 'none'
+                }
+              >
+                <div className="flex items-center justify-center">
+                  Unbilled Jobs
+                  {sortColumn === 'unbilledJobs' && (
+                    <span className="ml-1">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+                  )}
+                </div>
+              </TableHead>
               <TableHead className="text-right whitespace-nowrap">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -729,10 +773,28 @@ export function CustomersTable({
                         )}
                       </div>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {customer.email || '-'}
+                        {customer.email ? (
+                          <a
+                            href={`mailto:${customer.email}`}
+                            className="text-blue-300 hover:text-blue-200"
+                          >
+                            {customer.email}
+                          </a>
+                        ) : (
+                          '-'
+                        )}
                       </span>
                       <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatPhoneNumber(customer.phone)}
+                        {customer.phone ? (
+                          <a
+                            href={`tel:${normalizePhone(customer.phone)}`}
+                            className="text-blue-300 hover:text-blue-200"
+                          >
+                            {formatPhoneNumber(customer.phone)}
+                          </a>
+                        ) : (
+                          '-'
+                        )}
                       </span>
                     </div>
                   </TableCell>
@@ -792,6 +854,13 @@ export function CustomersTable({
                 <TableCell className="text-center">
                   {customer.openInvoices > 0 ? (
                     <Badge variant="outline">{customer.openInvoices}</Badge>
+                  ) : (
+                    <span className="text-sm text-gray-400">-</span>
+                  )}
+                </TableCell>
+                <TableCell className="text-center">
+                  {customer.unbilledJobs > 0 ? (
+                    <Badge variant="outline">{customer.unbilledJobs}</Badge>
                   ) : (
                     <span className="text-sm text-gray-400">-</span>
                   )}

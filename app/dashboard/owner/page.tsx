@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -37,6 +38,7 @@ const formatPhoneNumber = (phone: string | null) => {
 
 export default function OwnerDashboardPage() {
   const { user, profile, loading, hasProfile } = useAuth()
+  const { memberships, activeCompanyId, loading: contextLoading } = useCompanyContext()
   const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
   const [loadingData, setLoadingData] = useState(true)
@@ -126,6 +128,7 @@ export default function OwnerDashboardPage() {
         return
       }
 
+      setLoadingData(true)
       try {
         const {
           data: { user: authUser },
@@ -144,20 +147,26 @@ export default function OwnerDashboardPage() {
           return
         }
 
-        // Check if user is an owner
-        const { data: ownerData } = await supabase
-          .from('company_owners')
-          .select('company_id, companies(*)')
-          .eq('profile_id', profile.id)
+        const ownerCompanyIds = memberships
+          .filter((membership) => membership.roles.includes('owner'))
+          .map((membership) => membership.company_id)
 
-        // If not an owner, redirect to employee dashboard
-        if (!ownerData || ownerData.length === 0) {
+        if (ownerCompanyIds.length === 0) {
           console.log('Owner Dashboard: User is not an owner, redirecting to employee dashboard')
           router.push('/dashboard/employee')
           return
         }
 
-        const ownedCompanies = ownerData?.map(o => o.companies as unknown as Company) || []
+        const { data: companiesData, error: companiesError } = await supabase
+          .from('companies')
+          .select('*')
+          .in('id', ownerCompanyIds)
+
+        if (companiesError) {
+          console.error('Owner Dashboard: Failed to load companies', companiesError)
+        }
+
+        const ownedCompanies = (companiesData ?? []) as Company[]
         setCompanies(ownedCompanies.filter(Boolean) as Company[])
 
         // Fetch accountant data if we have companies
@@ -211,10 +220,10 @@ export default function OwnerDashboardPage() {
       setLoadingData(false)
     }
 
-    if (profile) {
+    if (profile && !contextLoading) {
       fetchCompanyData()
     }
-  }, [profile, router])
+  }, [profile, memberships, activeCompanyId, contextLoading, router])
 
   useEffect(() => {
     const fetchOwnerAvailability = async () => {

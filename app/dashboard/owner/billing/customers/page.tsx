@@ -19,11 +19,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 
 type JobStatusFilter = 'all' | 'with-jobs' | 'unassigned' | 'assigned' | 'in-progress' | 'done' | 'no-active-jobs'
 
 export default function BillingCustomersPage() {
   const router = useRouter()
+  const { activeCompanyId, loading: contextLoading } = useCompanyContext()
   const [customers, setCustomers] = useState<CustomerWithBilling[]>([])
   const [filteredCustomers, setFilteredCustomers] = useState<CustomerWithBilling[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,13 +44,23 @@ export default function BillingCustomersPage() {
   // Fetch customers with job status information
   const fetchCustomersData = async (status: CustomerStatus = statusFilter) => {
     try {
+      if (!activeCompanyId) {
+        if (!contextLoading) {
+          setCustomers([])
+          setFilteredCustomers([])
+          setLoading(false)
+          setRefreshing(false)
+        }
+        return
+      }
+
       if (customers.length === 0) {
         setLoading(true)
       } else {
         setRefreshing(true)
       }
       // Pull billing info only; skip per-customer job status to avoid N+1 requests.
-      const billingData = await getCustomersWithBilling(status)
+      const billingData = await getCustomersWithBilling(status, activeCompanyId)
       setCustomers(billingData)
       setFilteredCustomers(billingData)
     } catch (error) {
@@ -61,7 +73,7 @@ export default function BillingCustomersPage() {
 
   useEffect(() => {
     fetchCustomersData(statusFilter)
-  }, [statusFilter])
+  }, [statusFilter, activeCompanyId])
 
   // Filter customers based on job status and search
   useEffect(() => {

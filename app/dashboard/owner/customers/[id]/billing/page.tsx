@@ -1,7 +1,7 @@
 'use client'
 
 import { use, useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Plus, CreditCard, ArrowLeft } from 'lucide-react'
@@ -18,6 +18,7 @@ import { InlineInvoiceForm } from '@/components/billing/InlineInvoiceForm'
 import { AddPaymentDrawer } from '@/components/customers/AddPaymentDrawer'
 import { useToast } from '@/hooks/useToast'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 
 interface PageProps {
   params: Promise<{ id: string }>
@@ -27,7 +28,9 @@ export default function CustomerBillingPage({ params }: PageProps) {
   const resolvedParams = use(params)
   const customerId = resolvedParams.id
   const router = useRouter()
+  const { activeCompanyId, loading: contextLoading } = useCompanyContext()
   const { toast } = useToast()
+  const searchParams = useSearchParams()
 
   const [invoiceDrawerOpen, setInvoiceDrawerOpen] = useState(false)
   const [paymentDrawerOpen, setPaymentDrawerOpen] = useState(false)
@@ -37,11 +40,13 @@ export default function CustomerBillingPage({ params }: PageProps) {
   const [invoices, setInvoices] = useState<any[]>([])
   const [invoicesLoading, setInvoicesLoading] = useState(true)
   const [companyInfo, setCompanyInfo] = useState<any>(null)
+  const [prefillHandled, setPrefillHandled] = useState(false)
 
   const billingHeader = useCustomerBillingHeader(customerId)
   const unpaidJobs = useUnpaidJobs(customerId)
   const unappliedPayments = useUnappliedPayments(customerId)
   const { createInvoice, loading: creatingInvoice } = useCreateInvoice()
+  const prefillJobId = searchParams.get('jobId')
 
   // Fetch customer name
   useEffect(() => {
@@ -63,11 +68,19 @@ export default function CustomerBillingPage({ params }: PageProps) {
   useEffect(() => {
     async function fetchCompanyInfo() {
       try {
+        if (!activeCompanyId) {
+          if (!contextLoading) {
+            setCompanyInfo(null)
+          }
+          return
+        }
+
         const response = await fetch('/api/companies')
         if (response.ok) {
           const data = await response.json()
           if (Array.isArray(data) && data.length > 0) {
-            setCompanyInfo(data[0])
+            const selected = data.find((company: { id: string }) => company.id === activeCompanyId)
+            setCompanyInfo(selected || data[0])
           }
         }
       } catch (error) {
@@ -75,7 +88,7 @@ export default function CustomerBillingPage({ params }: PageProps) {
       }
     }
     fetchCompanyInfo()
-  }, [])
+  }, [activeCompanyId, contextLoading])
 
   // Fetch invoices
   useEffect(() => {
@@ -95,6 +108,29 @@ export default function CustomerBillingPage({ params }: PageProps) {
     }
     fetchInvoices()
   }, [customerId])
+
+  useEffect(() => {
+    setPrefillHandled(false)
+  }, [prefillJobId])
+
+  useEffect(() => {
+    if (!prefillJobId || prefillHandled || unpaidJobs.loading) {
+      return
+    }
+
+    const matchingJob = unpaidJobs.data.find(job => job.id === prefillJobId)
+    if (matchingJob) {
+      setSelectedJobIds([prefillJobId])
+      setInvoiceDrawerOpen(true)
+    } else if (prefillJobId) {
+      toast({
+        variant: 'destructive',
+        title: 'Job already invoiced',
+        description: 'This job has already been billed and is no longer available to invoice.',
+      })
+    }
+    setPrefillHandled(true)
+  }, [prefillJobId, prefillHandled, unpaidJobs.loading, unpaidJobs.data, toast])
 
   const refreshAllData = () => {
     billingHeader.refresh()

@@ -57,6 +57,28 @@ export interface CompanyOwner {
   updated_at: string
 }
 
+export type CompanyRole = 'owner' | 'employee'
+
+export interface ProfileCompanyContext {
+  profile_id: string
+  active_company_id: string | null
+  active_role: CompanyRole | null
+  created_at: string
+  updated_at: string
+}
+
+export interface CompanyMembership {
+  company_id: string
+  company_name: string | null
+  company_logo_url: string | null
+  roles: CompanyRole[]
+  owner_id: string | null
+  employee_id: string | null
+  approval_status: ApprovalStatus | null
+  work_status: WorkStatus | null
+  is_primary_owner: boolean | null
+}
+
 export type EmploymentStatus = 'active' | 'terminated' | 'on_leave'
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 export type WorkStatus = 'available' | 'inactive' | 'vacation' | 'sick'
@@ -75,6 +97,7 @@ export interface CompanyEmployee {
   employment_status: EmploymentStatus
   approval_status: ApprovalStatus
   work_status: WorkStatus
+  hourly_rate: number | null
   is_manager: boolean
   created_at: string
   updated_at: string
@@ -107,6 +130,23 @@ export interface Customer {
   notes: string | null
   archived: boolean
   archived_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Supplier {
+  id: string  // uuid
+  company_id: string
+  label: string | null
+  name: string
+  phone: string | null
+  address: string | null
+  address_line_2: string | null
+  city: string | null
+  state: string | null
+  zipcode: string | null
+  country: CountryCode | null
+  account_number: string | null
   created_at: string
   updated_at: string
 }
@@ -162,6 +202,7 @@ export interface Job {
 
   // Status
   status: JobStatus
+  billing_hold: boolean
 
   // Planned date
   planned_end_date: string | null  // date

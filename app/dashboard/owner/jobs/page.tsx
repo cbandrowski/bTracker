@@ -1,21 +1,22 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useEffect, useState } from 'react'
 import { Customer, Job, JobWithCustomer } from '@/types/database'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
-import { jobsService, companiesService } from '@/lib/services'
+import { jobsService } from '@/lib/services'
 
 export default function JobsPage() {
   const { profile } = useAuth()
+  const { activeCompanyId, loading: contextLoading } = useCompanyContext()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [jobs, setJobs] = useState<JobWithCustomer[]>([])
   const [paidJobIds, setPaidJobIds] = useState<Set<string>>(new Set())
   const [loadingData, setLoadingData] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [companyId, setCompanyId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [returnPath, setReturnPath] = useState<string | null>(null)
   const [hasReturnPath, setHasReturnPath] = useState(false)
@@ -41,22 +42,14 @@ export default function JobsPage() {
 
   useEffect(() => {
     const fetchJobs = async () => {
-      if (!profile?.id) {
-        setLoadingData(false)
+      if (!profile?.id || !activeCompanyId) {
+        if (!contextLoading) {
+          setLoadingData(false)
+        }
         return
       }
 
       try {
-        // Get owned companies
-        const companiesResponse = await companiesService.getAll()
-
-        if (companiesResponse.error || !companiesResponse.data || companiesResponse.data.length === 0) {
-          setLoadingData(false)
-          return
-        }
-
-        setCompanyId(companiesResponse.data[0].id)
-
         // Fetch jobs via API
         const response = await jobsService.getAll()
 
@@ -66,7 +59,7 @@ export default function JobsPage() {
           return
         }
 
-        setJobs(response.data || [])
+        setJobs((response.data || []).filter((job) => job.company_id === activeCompanyId))
 
         // Fetch paid job IDs
         const paidResponse = await fetch('/api/jobs/paid')
@@ -81,10 +74,12 @@ export default function JobsPage() {
       setLoadingData(false)
     }
 
-    if (profile) {
+    if (profile && activeCompanyId) {
       fetchJobs()
+    } else if (!contextLoading) {
+      setLoadingData(false)
     }
-  }, [profile])
+  }, [profile, activeCompanyId, contextLoading])
 
   // Check if we should open the create form
   useEffect(() => {
@@ -169,7 +164,7 @@ export default function JobsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!companyId) {
+    if (!activeCompanyId) {
       alert('No company found. Please create a company first.')
       return
     }
@@ -207,8 +202,8 @@ export default function JobsPage() {
     setSubmitting(true)
 
     try {
-      const jobData: Omit<Job, 'id' | 'created_at' | 'updated_at'> = {
-        company_id: companyId,
+      const jobData: Omit<Job, 'id' | 'created_at' | 'updated_at' | 'billing_hold'> = {
+        company_id: activeCompanyId,
         customer_id: formData.customer_id,
         title: formData.title,
         summary: formData.summary || null,

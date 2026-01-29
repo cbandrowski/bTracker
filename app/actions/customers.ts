@@ -44,6 +44,7 @@ export interface CustomerWithBilling {
   billedBalance: number
   unappliedCredit: number
   openInvoices: number
+  unbilledJobs: number
   created_at: string
   serviceAddresses?: CustomerServiceAddress[]
 }
@@ -53,7 +54,8 @@ export interface CustomerWithBilling {
  * Efficiently fetches in parallel to avoid N+1 queries
  */
 export async function getCustomersWithBilling(
-  status: CustomerStatus = 'active'
+  status: CustomerStatus = 'active',
+  companyId?: string
 ): Promise<CustomerWithBilling[]> {
   const supabase = await createServerClient()
   const user = await getCurrentUser(supabase)
@@ -66,6 +68,10 @@ export async function getCustomersWithBilling(
   if (companyIds.length === 0) {
     return []
   }
+  if (companyId && !companyIds.includes(companyId)) {
+    return []
+  }
+  const scopedCompanyIds = companyId ? [companyId] : companyIds
 
   // Fetch customers with full address information
   let query = supabase
@@ -93,7 +99,7 @@ export async function getCustomersWithBilling(
       archived_at,
       created_at
     `)
-    .in('company_id', companyIds)
+    .in('company_id', scopedCompanyIds)
 
   if (status !== 'all') {
     query = query.eq('archived', status === 'archived')
@@ -106,11 +112,44 @@ export async function getCustomersWithBilling(
     return []
   }
 
+  const customerIds = customers.map((customer) => customer.id)
+  const unbilledJobsByCustomer = new Map<string, number>()
+
+  if (customerIds.length > 0) {
+    const { data: doneJobs, error: jobsError } = await supabase
+      .from('jobs')
+      .select('id, customer_id')
+      .in('company_id', scopedCompanyIds)
+      .in('customer_id', customerIds)
+      .eq('status', 'done')
+
+    if (!jobsError && doneJobs && doneJobs.length > 0) {
+      const jobIds = doneJobs.map((job) => job.id)
+      const { data: invoiceLines } = await supabase
+        .from('invoice_lines')
+        .select('job_id')
+        .in('job_id', jobIds)
+
+      const invoicedJobIds = new Set(
+        (invoiceLines || [])
+          .map((line) => line.job_id)
+          .filter((jobId): jobId is string => Boolean(jobId))
+      )
+
+      doneJobs.forEach((job) => {
+        if (!invoicedJobIds.has(job.id)) {
+          const current = unbilledJobsByCustomer.get(job.customer_id) || 0
+          unbilledJobsByCustomer.set(job.customer_id, current + 1)
+        }
+      })
+    }
+  }
+
   // Batch fetch billing data and service addresses in parallel
   const customersWithBilling = await Promise.all(
     customers.map(async (customer) => {
       const [billingData, serviceAddressesData] = await Promise.all([
-        getCustomerBillingHeader(customer.id),
+        getCustomerBillingHeader(customer.id, companyId),
         supabase
           .from('customer_service_addresses')
           .select('id, label, address, address_line_2, city, state, zipcode, country')
@@ -123,6 +162,7 @@ export async function getCustomersWithBilling(
         billedBalance: billingData.billedBalance,
         unappliedCredit: billingData.unappliedCredit,
         openInvoices: billingData.openInvoices,
+        unbilledJobs: unbilledJobsByCustomer.get(customer.id) || 0,
         serviceAddresses: serviceAddressesData.data || [],
       }
     })
@@ -134,7 +174,7 @@ export async function getCustomersWithBilling(
 /**
  * Get billing header for a single customer
  */
-export async function getCustomerBillingHeader(customerId: string) {
+export async function getCustomerBillingHeader(customerId: string, companyId?: string) {
   const supabase = await createServerClient()
   const user = await getCurrentUser(supabase)
 
@@ -143,13 +183,17 @@ export async function getCustomerBillingHeader(customerId: string) {
   }
 
   const companyIds = await getUserCompanyIds(supabase, user.id)
+  if (companyId && !companyIds.includes(companyId)) {
+    return { billedBalance: 0, unappliedCredit: 0, openInvoices: 0 }
+  }
+  const scopedCompanyIds = companyId ? [companyId] : companyIds
 
   // Get billed balance from view
   const { data: balanceData } = await supabase
     .from('v_customer_billed_balance')
     .select('billed_balance, unapplied_credit')
     .eq('customer_id', customerId)
-    .in('company_id', companyIds)
+    .in('company_id', scopedCompanyIds)
     .single()
 
   // Count open invoices - use v_invoice_summary to check balance_due instead of status
@@ -158,7 +202,7 @@ export async function getCustomerBillingHeader(customerId: string) {
     .from('v_invoice_summary')
     .select('balance_due, invoice_status')
     .eq('customer_id', customerId)
-    .in('company_id', companyIds)
+    .in('company_id', scopedCompanyIds)
     .not('invoice_status', 'in', '(void,cancelled,draft)')
 
   // Count invoices with outstanding balance

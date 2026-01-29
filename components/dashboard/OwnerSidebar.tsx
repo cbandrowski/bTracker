@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { Menu, X, LogOut } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
+import { CompanySwitcher } from '@/components/Company/CompanySwitcher'
 
 interface MenuItem {
   label: string
@@ -68,6 +69,7 @@ export function OwnerSidebar({ menu }: OwnerSidebarProps) {
           </div>
 
           <nav className="flex flex-col h-[calc(100%-4rem)] lg:h-full">
+            <CompanySwitcher />
             <div className="space-y-1 p-3 overflow-y-auto flex-1">
               {menu.map((item) => {
                 const isActive = pathname === item.link

@@ -1,11 +1,11 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 import { useCallback, useEffect, useState } from 'react'
 import { Customer } from '@/types/database'
 import AddressAutocomplete, { ParsedAddress } from '@/components/AddressAutocomplete'
-import { useRouter } from 'next/navigation'
-import { customersService, companiesService } from '@/lib/services'
+import { customersService } from '@/lib/services'
 import { getCustomersWithBilling, CustomerStatus, CustomerWithBilling } from '@/app/actions/customers'
 import { CustomersTable } from '@/components/customers/CustomersTable'
 import { AddPaymentDrawer } from '@/components/customers/AddPaymentDrawer'
@@ -22,12 +22,11 @@ import {
 
 export default function CustomersPage() {
   const { profile } = useAuth()
-  const router = useRouter()
+  const { activeCompanyId, loading: contextLoading } = useCompanyContext()
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customersWithBilling, setCustomersWithBilling] = useState<CustomerWithBilling[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [showForm, setShowForm] = useState(false)
-  const [companyId, setCompanyId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<CustomerStatus>('active')
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null)
   const [depositDrawerOpen, setDepositDrawerOpen] = useState(false)
@@ -62,23 +61,15 @@ export default function CustomersPage() {
   const [submitting, setSubmitting] = useState(false)
 
   const fetchCustomersData = useCallback(async (status: CustomerStatus = statusFilter) => {
-    if (!profile?.id) {
-      setLoadingData(false)
+    if (!profile?.id || !activeCompanyId) {
+      if (!contextLoading) {
+        setLoadingData(false)
+      }
       return
     }
 
     try {
       setLoadingData(true)
-
-      // Get owned companies
-      const companiesResponse = await companiesService.getAll()
-
-      if (companiesResponse.error || !companiesResponse.data || companiesResponse.data.length === 0) {
-        setLoadingData(false)
-        return
-      }
-
-      setCompanyId(companiesResponse.data[0].id) // Use first company for now
 
       // Fetch customers via API
       const response = await customersService.getAll(status)
@@ -89,17 +80,17 @@ export default function CustomersPage() {
         return
       }
 
-      setCustomers(response.data || [])
+      setCustomers((response.data || []).filter((customer) => customer.company_id === activeCompanyId))
 
       // Fetch customers with billing data
-      const billingData = await getCustomersWithBilling(status)
+      const billingData = await getCustomersWithBilling(status, activeCompanyId)
       setCustomersWithBilling(billingData)
     } catch (error) {
       console.error('Error fetching customers:', error)
     }
 
     setLoadingData(false)
-  }, [profile?.id, statusFilter])
+  }, [profile?.id, statusFilter, activeCompanyId, contextLoading])
 
   useEffect(() => {
     if (profile) {
@@ -173,7 +164,7 @@ export default function CustomersPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    if (!companyId) {
+    if (!activeCompanyId) {
       alert('No company found. Please create a company first.')
       return
     }
@@ -196,7 +187,7 @@ export default function CustomersPage() {
       } else {
         // Create new customer via API
         const customerData = {
-          company_id: companyId,
+          company_id: activeCompanyId,
           ...formData
         }
 

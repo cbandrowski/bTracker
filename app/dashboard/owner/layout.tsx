@@ -6,57 +6,66 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import { OwnerSidebar } from '@/components/dashboard/OwnerSidebar'
 import { Crown, LogOut, Settings } from 'lucide-react'
+import { useCompanyContext } from '@/contexts/CompanyContext'
 
 export default function OwnerLayout({ children }: { children: React.ReactNode }) {
   const { user, profile, loading } = useAuth()
+  const { activeCompanyId, activeRole, memberships, loading: contextLoading } = useCompanyContext()
   const router = useRouter()
   const [isOwner, setIsOwner] = useState<boolean | null>(null)
   const [employeeCount, setEmployeeCount] = useState(0)
 
   useEffect(() => {
-    const verifyOwner = async () => {
-      if (loading) return
+    if (loading || contextLoading) return
 
-      if (!user) {
-        router.push('/login')
+    if (!user) {
+      router.push('/login')
+      return
+    }
+
+    if (!profile) {
+      router.push('/onboarding')
+      return
+    }
+
+    const hasOwnerRole = memberships.some((membership) =>
+      membership.roles.includes('owner')
+    )
+
+    if (!hasOwnerRole) {
+      console.log('User is not an owner, redirecting to employee dashboard')
+      router.push('/dashboard/employee')
+      return
+    }
+
+    if (activeRole !== 'owner') {
+      router.push('/dashboard/employee')
+      return
+    }
+
+    setIsOwner(true)
+  }, [user, profile, loading, contextLoading, memberships, activeRole, router])
+
+  useEffect(() => {
+    const fetchEmployeeCount = async () => {
+      if (!activeCompanyId || !profile?.id) {
+        setEmployeeCount(0)
         return
       }
 
-      if (!profile) {
-        router.push('/onboarding')
-        return
-      }
-
-      // Check if user is an owner
-      const { data: ownerData } = await supabase
-        .from('company_owners')
-        .select('company_id')
-        .eq('profile_id', profile.id)
-        .limit(1)
-
-      if (!ownerData || ownerData.length === 0) {
-        console.log('User is not an owner, redirecting to employee dashboard')
-        router.push('/dashboard/employee')
-        return
-      }
-
-      setIsOwner(true)
-
-      // Fetch employee count for the menu
-      const companyIds = ownerData.map(o => o.company_id)
       const { data: employeesData } = await supabase
         .from('company_employees')
         .select('id', { count: 'exact' })
-        .in('company_id', companyIds)
+        .eq('company_id', activeCompanyId)
         .neq('profile_id', profile.id)
 
       setEmployeeCount(employeesData?.length || 0)
     }
 
-    verifyOwner()
-  }, [user, profile, loading, router])
+    fetchEmployeeCount()
+  }, [activeCompanyId, profile?.id])
 
-  if (loading || isOwner === null) {
+  if (loading || contextLoading || isOwner === null) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-900 via-slate-900 to-violet-950 flex items-center justify-center">
         <div className="text-xl text-purple-200">Loading Guild Hall...</div>
@@ -147,15 +156,6 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-        </svg>
-      ),
-    },
-    {
-      label: 'Merchant Contacts',
-      link: '/dashboard/owner/vendor-contacts',
-      icon: (
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
         </svg>
       ),
     },
