@@ -59,6 +59,62 @@ export interface CompanyOwner {
 
 export type CompanyRole = 'owner' | 'employee'
 
+export type OwnerChangeAction = 'add_owner' | 'remove_owner'
+export type OwnerChangeStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled'
+  | 'executed'
+  | 'expired'
+export type OwnerChangeDecision = 'approve' | 'reject'
+
+export interface OwnerChangeRequest {
+  id: string
+  company_id: string
+  action: OwnerChangeAction
+  target_profile_id: string
+  created_by: string | null
+  status: OwnerChangeStatus
+  required_approvals: number
+  cooldown_hours: number
+  approved_at: string | null
+  effective_at: string | null
+  executed_at: string | null
+  rejected_at: string | null
+  cancelled_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface OwnerChangeApproval {
+  id: string
+  request_id: string
+  approver_profile_id: string
+  decision: OwnerChangeDecision
+  created_at: string
+}
+
+export interface AuditLogDiffEntry {
+  field: string
+  before: unknown | null
+  after: unknown | null
+}
+
+export interface AuditLog {
+  id: string
+  company_id: string
+  actor_profile_id: string | null
+  action: string
+  entity_table: string
+  entity_id: string | null
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  diff: AuditLogDiffEntry[] | null
+  metadata: Record<string, unknown> | null
+  created_at: string
+}
+
 export interface ProfileCompanyContext {
   profile_id: string
   active_company_id: string | null

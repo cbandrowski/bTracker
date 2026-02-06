@@ -88,6 +88,33 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
+      label: 'Stats',
+      link: '/dashboard/owner/stats',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18h18M7 13l3 3 7-7" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Owners',
+      link: '/dashboard/owner/owners',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 20l2-7L2 9h7l3-7z" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Audit Log',
+      link: '/dashboard/owner/audit',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6M7 4h10a2 2 0 012 2v14l-4-3-4 3-4-3-4 3V6a2 2 0 012-2z" />
+        </svg>
+      ),
+    },
+    {
       label: `Warriors (${employeeCount})`,
       link: '/dashboard/owner/team',
       icon: (
