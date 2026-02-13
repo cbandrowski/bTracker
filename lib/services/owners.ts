@@ -119,7 +119,17 @@ export async function listOwnersForCompany(
     throw new ServiceError(`Failed to load owners: ${error.message}`, 500)
   }
 
-  return (data ?? []) as OwnerWithProfile[]
+  const owners = (data ?? []).map((row) => {
+    const profile = Array.isArray(row.profile)
+      ? row.profile[0] ?? null
+      : row.profile ?? null
+    return {
+      ...row,
+      profile,
+    } as OwnerWithProfile
+  })
+
+  return owners
 }
 
 export async function listOwnerChangeRequests(
@@ -165,7 +175,32 @@ export async function listOwnerChangeRequests(
     throw new ServiceError(`Failed to load owner change requests: ${error.message}`, 500)
   }
 
-  return (data ?? []) as OwnerChangeRequestWithDetails[]
+  const requests = (data ?? []).map((row) => {
+    const targetProfile = Array.isArray(row.target_profile)
+      ? row.target_profile[0] ?? null
+      : row.target_profile ?? null
+    const createdByProfile = Array.isArray(row.created_by_profile)
+      ? row.created_by_profile[0] ?? null
+      : row.created_by_profile ?? null
+    const approvals = (row.approvals ?? []).map((approval) => {
+      const approverProfile = Array.isArray(approval.approver_profile)
+        ? approval.approver_profile[0] ?? null
+        : approval.approver_profile ?? null
+      return {
+        ...approval,
+        approver_profile: approverProfile,
+      } as OwnerChangeApprovalWithProfile
+    })
+
+    return {
+      ...row,
+      target_profile: targetProfile,
+      created_by_profile: createdByProfile,
+      approvals,
+    } as OwnerChangeRequestWithDetails
+  })
+
+  return requests
 }
 
 export async function createOwnerChangeRequest(

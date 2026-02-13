@@ -293,9 +293,9 @@ export function EditInvoiceDialog({
         throw new Error(response.error)
       }
 
-      const status = response.data?.status
+      const responseStatus = response.data?.status
 
-      if (status === 'pending') {
+      if (responseStatus === 'pending') {
         toast({
           variant: 'success',
           title: 'Invoice update submitted',

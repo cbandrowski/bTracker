@@ -42,7 +42,7 @@ interface ApplyPaymentDrawerProps {
   customerName: string
   onSuccess?: () => void
 }
-
+//build fix
 type PaymentMethod = 'cash' | 'check' | 'credit_card' | 'debit_card' | 'bank_transfer' | 'other'
 
 export function ApplyPaymentDrawer({

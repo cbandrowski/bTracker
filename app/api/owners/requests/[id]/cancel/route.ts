@@ -7,7 +7,10 @@ const ParamsSchema = z.object({
   id: z.string().uuid(),
 })
 
-export async function POST(_request: NextRequest, context: { params: { id: string } }) {
+export async function POST(
+  _request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
   try {
     const supabase = await createServerClient()
     const user = await getCurrentUser(supabase)
@@ -16,12 +19,12 @@ export async function POST(_request: NextRequest, context: { params: { id: strin
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const params = ParamsSchema.parse(context.params)
+    const { id } = ParamsSchema.parse(await params)
 
     const { data: requestRow, error: requestError } = await supabase
       .from('owner_change_requests')
       .select('company_id')
-      .eq('id', params.id)
+      .eq('id', id)
       .maybeSingle()
 
     if (requestError) {
@@ -36,7 +39,7 @@ export async function POST(_request: NextRequest, context: { params: { id: strin
       supabase,
       user.id,
       requestRow.company_id,
-      params.id
+      id
     )
 
     return NextResponse.json({ request: updated })
