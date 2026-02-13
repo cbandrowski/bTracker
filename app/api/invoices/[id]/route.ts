@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
 import { UpdateInvoiceSchema } from '@/lib/schemas/billing'
-import { deleteInvoice, updateInvoice } from '@/lib/services/invoices'
+import { deleteInvoice } from '@/lib/services/invoices'
+import { requestInvoiceUpdate, ServiceError } from '@/lib/services/approvals'
 import { ZodError } from 'zod'
 
 export async function GET(
@@ -193,14 +194,32 @@ export async function PATCH(
     const body = await request.json()
     const validated = UpdateInvoiceSchema.parse(body)
 
-    const updated = await updateInvoice(supabase, invoiceId, companyIds, user.id, validated)
-    return NextResponse.json(updated)
+    const result = await requestInvoiceUpdate(supabase, user.id, invoiceId, validated)
+
+    if (result.applied) {
+      return NextResponse.json({
+        status: 'applied',
+        ...(result.result || {}),
+      })
+    }
+
+    return NextResponse.json(
+      {
+        status: 'pending',
+        approval: result.approval ?? null,
+        message: 'Invoice update submitted for approval',
+      },
+      { status: 202 }
+    )
   } catch (error) {
     if (error instanceof ZodError) {
       return NextResponse.json(
         { error: 'Validation error', details: error.issues },
         { status: 422 }
       )
+    }
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
     }
     console.error('Error updating invoice:', error)
     return NextResponse.json(

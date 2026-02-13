@@ -97,7 +97,16 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
       ),
     },
     {
-      label: 'Owners',
+      label: 'Approvals',
+      link: '/dashboard/owner/approvals',
+      icon: (
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3l7 4v5c0 5-3.5 8-7 9-3.5-1-7-4-7-9V7l7-4z" />
+        </svg>
+      ),
+    },
+    {
+      label: 'Company Info',
       link: '/dashboard/owner/owners',
       icon: (
         <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" className="w-5 h-5">

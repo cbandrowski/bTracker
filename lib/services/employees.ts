@@ -1,5 +1,6 @@
 import { SupabaseServerClient } from '@/lib/supabaseServer'
-import { ApprovalStatus, CompanyEmployee, Profile, WorkStatus } from '@/types/database'
+import { ApprovalRequest, ApprovalStatus, CompanyEmployee, Profile, WorkStatus } from '@/types/database'
+import { requestEmployeePayChange } from '@/lib/services/approvals'
 
 const TABLE_NAME = 'company_employees'
 
@@ -101,6 +102,12 @@ export type EmployeeUpdatePayload = {
   work_status?: WorkStatus
   approval_status?: ApprovalStatus
   department?: string | null
+}
+
+export type EmployeeUpdateResult = {
+  employee: EmployeeWithProfile
+  approval?: ApprovalRequest
+  approval_applied?: boolean
 }
 
 const profileSelect = `
@@ -214,7 +221,7 @@ export async function updateEmployeeForOwner(
   profileId: string,
   employeeId: string,
   updates: EmployeeUpdatePayload
-): Promise<EmployeeWithProfile> {
+): Promise<EmployeeUpdateResult> {
   const employee = await getEmployeeById(supabase, employeeId)
 
   if (!employee) {
@@ -223,24 +230,63 @@ export async function updateEmployeeForOwner(
 
   await assertOwnerAccess(supabase, profileId, employee.company_id)
 
-  const { data, error } = await supabase
-    .from(TABLE_NAME)
-    .update({
-      ...updates,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', employeeId)
-    .select(
-      `
-        *,
-        profile:profiles(${profileSelect})
-      `
-    )
-    .single()
+  const { hourly_rate, ...rest } = updates
+  const updateFields = Object.fromEntries(
+    Object.entries(rest).filter(([, value]) => value !== undefined)
+  )
 
-  if (error) {
-    throw new ServiceError(`Failed to update employee: ${error.message}`, 500)
+  let updatedEmployee: EmployeeWithProfile | null = null
+
+  if (Object.keys(updateFields).length > 0) {
+    const { data, error } = await supabase
+      .from(TABLE_NAME)
+      .update({
+        ...updateFields,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', employeeId)
+      .select(
+        `
+          *,
+          profile:profiles(${profileSelect})
+        `
+      )
+      .single()
+
+    if (error) {
+      throw new ServiceError(`Failed to update employee: ${error.message}`, 500)
+    }
+
+    updatedEmployee = data as EmployeeWithProfile
+  } else {
+    updatedEmployee = await getEmployeeWithProfileForOwner(supabase, profileId, employeeId)
   }
 
-  return data as EmployeeWithProfile
+  let approval: ApprovalRequest | undefined
+  let approvalApplied = false
+
+  if (hourly_rate !== undefined) {
+    const result = await requestEmployeePayChange(
+      supabase,
+      profileId,
+      employeeId,
+      hourly_rate ?? null
+    )
+    approval = result.approval ?? undefined
+    approvalApplied = result.applied
+
+    if (approvalApplied) {
+      updatedEmployee = await getEmployeeWithProfileForOwner(supabase, profileId, employeeId)
+    }
+  }
+
+  if (!updatedEmployee) {
+    throw new ServiceError('Failed to load employee after update', 500)
+  }
+
+  return {
+    employee: updatedEmployee,
+    approval,
+    approval_applied: approvalApplied,
+  }
 }

@@ -69,6 +69,49 @@ export type OwnerChangeStatus =
   | 'expired'
 export type OwnerChangeDecision = 'approve' | 'reject'
 
+export type ApprovalRequestAction =
+  | 'employee_pay_change'
+  | 'job_update'
+  | 'invoice_update'
+export type ApprovalRequestStatus =
+  | 'pending'
+  | 'approved'
+  | 'rejected'
+  | 'cancelled'
+  | 'applied'
+  | 'failed'
+export type ApprovalRequestDecision = 'approve' | 'reject'
+
+export interface ApprovalRequest {
+  id: string
+  company_id: string
+  action: ApprovalRequestAction
+  entity_table: string
+  entity_id: string
+  entity_label: string | null
+  summary: string | null
+  payload: Record<string, unknown>
+  requested_by: string | null
+  status: ApprovalRequestStatus
+  required_approvals: number
+  approved_at: string | null
+  rejected_at: string | null
+  cancelled_at: string | null
+  applied_at: string | null
+  applied_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ApprovalDecision {
+  id: string
+  approval_id: string
+  approver_profile_id: string
+  decision: ApprovalRequestDecision
+  note: string | null
+  created_at: string
+}
+
 export interface OwnerChangeRequest {
   id: string
   company_id: string

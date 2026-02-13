@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createServerClient, getCurrentUser, getUserCompanyIds } from '@/lib/supabaseServer'
+import { requestJobUpdate, ServiceError } from '@/lib/services/approvals'
 
 // GET /api/jobs/[id] - Get a single job
 export async function GET(
@@ -57,42 +59,68 @@ export async function PUT(
     }
 
     const body = await request.json()
+
+    const JobUpdateSchema = z.object({
+      title: z.string().min(1).optional(),
+      summary: z.string().nullable().optional(),
+      service_address: z.string().nullable().optional(),
+      service_address_line_2: z.string().nullable().optional(),
+      service_city: z.string().nullable().optional(),
+      service_state: z.string().nullable().optional(),
+      service_zipcode: z.string().nullable().optional(),
+      service_country: z.string().nullable().optional(),
+      tasks_to_complete: z.string().nullable().optional(),
+      status: z.enum(['upcoming', 'in_progress', 'done', 'cancelled']).optional(),
+      planned_end_date: z.string().nullable().optional(),
+      estimated_amount: z.number().min(0).nullable().optional(),
+      arrival_window_start_time: z.string().nullable().optional(),
+      arrival_window_end_time: z.string().nullable().optional(),
+    })
+
+    const validation = JobUpdateSchema.safeParse(body)
+
+    if (!validation.success) {
+      return NextResponse.json(
+        { error: 'Validation error', details: validation.error.issues },
+        { status: 422 }
+      )
+    }
+
     const companyIds = await getUserCompanyIds(supabase, user.id)
-
-    // Verify job belongs to user's company
-    const { data: existing } = await supabase
-      .from('jobs')
-      .select('company_id, status')
-      .eq('id', id)
-      .single()
-
-    if (!existing || !companyIds.includes(existing.company_id)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
+    if (companyIds.length === 0) {
+      return NextResponse.json({ error: 'No company found' }, { status: 403 })
     }
 
-    // If status is being changed to 'done', set completed_at timestamp
-    const updateData = { ...body }
-    if (body.status === 'done' && existing.status !== 'done') {
-      updateData.completed_at = new Date().toISOString()
+    const result = await requestJobUpdate(supabase, user.id, id, validation.data)
+
+    if (result.approval && !result.applied) {
+      return NextResponse.json(
+        {
+          status: 'pending',
+          approval: result.approval,
+          job: result.job,
+          message: 'Job update submitted for approval',
+        },
+        { status: 202 }
+      )
     }
 
-    const { data, error } = await supabase
-      .from('jobs')
-      .update(updateData)
-      .eq('id', id)
-      .select(`
-        *,
-        customer:customers(*)
-      `)
-      .single()
-
-    if (error) {
-      console.error('Error updating job:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    return NextResponse.json(data)
+    return NextResponse.json({
+      status: 'applied',
+      job: result.job,
+    })
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation error', details: error.issues },
+        { status: 422 }
+      )
+    }
+
+    if (error instanceof ServiceError) {
+      return NextResponse.json({ error: error.message }, { status: error.statusCode })
+    }
+
     console.error('Unexpected error:', error)
     return NextResponse.json(
       { error: 'Internal server error' },

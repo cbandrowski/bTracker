@@ -293,19 +293,29 @@ export function EditInvoiceDialog({
         throw new Error(response.error)
       }
 
-      const balance = response.data?.summary?.balance
-      const balanceText =
-        typeof balance === 'number'
-          ? balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
-          : null
+      const status = response.data?.status
 
-      toast({
-        variant: 'success',
-        title: 'Invoice updated',
-        description: balanceText
-          ? `Totals recalculated. New balance: ${balanceText}`
-          : 'Totals recalculated.',
-      })
+      if (status === 'pending') {
+        toast({
+          variant: 'success',
+          title: 'Invoice update submitted',
+          description: response.data?.message || 'Waiting for another owner to approve.',
+        })
+      } else {
+        const balance = response.data?.summary?.balance
+        const balanceText =
+          typeof balance === 'number'
+            ? balance.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+            : null
+
+        toast({
+          variant: 'success',
+          title: 'Invoice updated',
+          description: balanceText
+            ? `Totals recalculated. New balance: ${balanceText}`
+            : 'Totals recalculated.',
+        })
+      }
 
       if (onSaved) await onSaved()
       onOpenChange(false)

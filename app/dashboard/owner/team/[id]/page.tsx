@@ -149,7 +149,12 @@ export default function EmployeeDetailPage() {
           ? Number(data.employee.hourly_rate).toFixed(2)
           : ''
       )
-      alert('Hourly rate updated')
+
+      if (data.approval && !data.approval_applied) {
+        alert(data.message || 'Pay change submitted for approval.')
+      } else {
+        alert('Hourly rate updated')
+      }
     } catch (err) {
       console.error('Error updating pay rate:', err)
       alert(err instanceof Error ? err.message : 'Failed to update pay rate')
