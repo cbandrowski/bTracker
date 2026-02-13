@@ -114,17 +114,27 @@ export async function PATCH(
       )
     }
 
-    const employee = await updateEmployeeForOwner(
+    const result = await updateEmployeeForOwner(
       supabase,
       user.id,
       employeeId,
       validation.data
     )
 
-    return NextResponse.json({
-      employee,
-      message: 'Employee updated successfully',
-    })
+    const pendingApproval = result.approval && !result.approval_applied
+    const message = pendingApproval
+      ? 'Pay change submitted for approval'
+      : 'Employee updated successfully'
+
+    return NextResponse.json(
+      {
+        employee: result.employee,
+        approval: result.approval ?? null,
+        approval_applied: result.approval_applied ?? false,
+        message,
+      },
+      { status: pendingApproval ? 202 : 200 }
+    )
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

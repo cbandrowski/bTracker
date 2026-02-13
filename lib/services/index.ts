@@ -2,7 +2,7 @@
 // Provides type-safe methods for all backend API routes
 
 import { api } from '../api'
-import { ApprovalStatus, AssignmentStatus, Company, CompanyEmployee, Customer, CustomerServiceAddress, InvoiceStatus, Job, JobAssignment, JobWithCustomer, Profile, Supplier, WorkStatus } from '@/types/database'
+import { ApprovalRequestAction, ApprovalRequestStatus, ApprovalStatus, AssignmentStatus, Company, CompanyEmployee, Customer, CustomerServiceAddress, InvoiceStatus, Job, JobAssignment, JobWithCustomer, Profile, Supplier, WorkStatus } from '@/types/database'
 
 type CustomerStatus = 'active' | 'archived' | 'all'
 
@@ -131,7 +131,12 @@ export const jobsService = {
 
   // Update a job
   async update(id: string, jobData: Partial<Job>) {
-    return api.put<JobWithCustomer>(`/jobs/${id}`, jobData)
+    return api.put<{
+      status?: 'applied' | 'pending'
+      job?: JobWithCustomer
+      approval?: { id: string; status: ApprovalRequestStatus; action: ApprovalRequestAction } | null
+      message?: string
+    }>(`/jobs/${id}`, jobData)
   },
 
   async setBillingHold(id: string, billingHold: boolean) {
@@ -224,7 +229,12 @@ export const employeesService = {
       department?: string | null
     }
   ) {
-    return api.patch<{ employee: CompanyEmployee & { profile?: Profile | null } }>(
+    return api.patch<{
+      employee: CompanyEmployee & { profile?: Profile | null }
+      approval?: { id: string; status: ApprovalRequestStatus; action: ApprovalRequestAction } | null
+      approval_applied?: boolean
+      message?: string
+    }>(
       `/employees/${id}`,
       payload
     )
@@ -247,9 +257,12 @@ export const companiesService = {
 // ============================================================================
 
 export interface InvoiceUpdateResponse {
-  invoiceId: string
-  invoiceNumber: string
-  summary: {
+  status?: 'applied' | 'pending'
+  approval?: { id: string; status: ApprovalRequestStatus; action: ApprovalRequestAction } | null
+  message?: string
+  invoiceId?: string
+  invoiceNumber?: string
+  summary?: {
     subtotal: number
     tax: number
     total: number
