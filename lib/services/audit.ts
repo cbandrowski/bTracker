@@ -83,8 +83,18 @@ export async function listAuditLogs(
     throw new ServiceError(`Failed to load audit logs: ${error.message}`, 500)
   }
 
+  const logs = (data ?? []).map((row) => {
+    const actorProfile = Array.isArray(row.actor_profile)
+      ? row.actor_profile[0] ?? null
+      : row.actor_profile ?? null
+    return {
+      ...row,
+      actor_profile: actorProfile,
+    } as AuditLogWithActor
+  })
+
   return {
-    logs: (data ?? []) as AuditLogWithActor[],
+    logs,
     total: count ?? 0,
   }
 }

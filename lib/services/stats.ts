@@ -177,7 +177,7 @@ export async function getCompanyOverviewStats(
     throw new ServiceError(`Failed to load employees: ${employeeError.message}`, 500)
   }
 
-  const employees = (employeeRows ?? []) as EmployeeRow[]
+  const employees = (employeeRows ?? []) as unknown as EmployeeRow[]
   const employeeProfileMap = new Map<string, Profile | null>()
   employees.forEach((employee) => {
     employeeProfileMap.set(employee.id, employee.profile ?? null)
@@ -192,7 +192,7 @@ export async function getCompanyOverviewStats(
     throw new ServiceError(`Failed to load owners: ${ownerError.message}`, 500)
   }
 
-  const owners = (ownerRows ?? []) as OwnerRow[]
+  const owners = (ownerRows ?? []) as unknown as OwnerRow[]
   const ownerProfileMap = new Map<string, Profile | null>()
   owners.forEach((owner) => {
     ownerProfileMap.set(owner.profile_id, owner.profile ?? null)

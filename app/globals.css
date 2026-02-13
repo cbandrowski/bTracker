@@ -1,7 +1,34 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: "Geist";
+  src: url("/fonts/Geist-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("/fonts/GeistMono-Variable.woff2") format("woff2");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cinzel";
+  src: url("/fonts/Cinzel-Variable.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* Fantasy guild palette (gold / amber on obsidian) */
+  --font-geist-sans: "Geist";
+  --font-geist-mono: "Geist Mono";
+  --font-cinzel: "Cinzel";
   --background: #0c0a08;
   --foreground: #f6e7c6;
   --muted: #1a130e;

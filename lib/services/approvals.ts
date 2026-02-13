@@ -311,7 +311,8 @@ export async function requestEmployeePayChange(
     return { approval: null, applied: false }
   }
 
-  const label = employee.profile?.full_name || employee.profile?.email || null
+  const profile = Array.isArray(employee.profile) ? employee.profile[0] : employee.profile
+  const label = profile?.full_name || profile?.email || null
   const summary = buildSummary(
     'employee_pay_change',
     `$${(normalizedCurrent ?? 0).toFixed(2)} → $${(normalizedNew ?? 0).toFixed(2)}`
